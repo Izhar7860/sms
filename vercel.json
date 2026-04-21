@@ -1,0 +1,14 @@
+{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/login", "destination": "/pages/login.html" },
+    { "source": "/admin", "destination": "/pages/admin-dashboard.html" },
+    { "source": "/admin-dashboard", "destination": "/pages/admin-dashboard.html" },
+    { "source": "/resident", "destination": "/pages/resident-dashboard.html" },
+    { "source": "/resident-dashboard", "destination": "/pages/resident-dashboard.html" },
+    { "source": "/parking", "destination": "/pages/parking.html" },
+    { "source": "/payments", "destination": "/pages/payments.html" },
+    { "source": "/complaints", "destination": "/pages/complaints.html" },
+    { "source": "/notices", "destination": "/pages/notices.html" }
+  ]
+}
