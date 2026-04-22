@@ -346,6 +346,7 @@ function renderComplaints() {
   complaintsTableBody.innerHTML = '';
   window.SMSData.complaints.forEach((complaint, index) => {
     const row = document.createElement('tr');
+    const complaintId = complaint.id || index;
     row.innerHTML = `
       <td>#${String(index + 1).padStart(3, '0')}</td>
       <td>${escapeHtml(complaint.title || complaint.subject || 'Complaint')}</td>
@@ -353,10 +354,73 @@ function renderComplaints() {
       <td>${escapeHtml(complaint.flat || '-')}</td>
       <td><span class="badge ${getComplaintBadgeClass(complaint.status)}">${escapeHtml(complaint.status || 'Pending')}</span></td>
       <td>${formatShortDate(complaint.date)}</td>
-      <td><button class="btn btn-sm btn-outline-secondary" type="button">View</button></td>
+      <td><button class="btn btn-sm btn-outline-secondary view-complaint-btn" type="button" data-id="${complaintId}">View</button></td>
     `;
     complaintsTableBody.appendChild(row);
   });
+
+  // Attach listeners via delegation
+  complaintsTableBody.addEventListener('click', (e) => {
+    const btn = e.target.closest('.view-complaint-btn');
+    if (btn) {
+      showComplaintDetails(btn.dataset.id);
+    }
+  });
+}
+
+function showComplaintDetails(id) {
+  const complaint = window.SMSData.complaints.find((c) => (c.id || window.SMSData.complaints.indexOf(c)).toString() === id.toString());
+  if (!complaint) return;
+
+  const modalEl = document.getElementById('complaintDetailsModal');
+  if (!modalEl) return;
+
+  document.getElementById('detail-subject').textContent = complaint.title || complaint.subject || 'Complaint';
+  document.getElementById('detail-resident').textContent = complaint.resident || 'Resident';
+  document.getElementById('detail-flat').textContent = complaint.flat || '-';
+  document.getElementById('detail-description').textContent = complaint.description || 'No description provided.';
+  document.getElementById('detail-date').textContent = formatDate(complaint.date);
+
+  const priorityEl = document.getElementById('detail-priority');
+  priorityEl.textContent = complaint.priority || 'Medium';
+  priorityEl.className = `badge bg-${getPriorityColor(complaint.priority)}`;
+
+  const statusEl = document.getElementById('detail-status');
+  statusEl.textContent = complaint.status || 'Pending';
+  statusEl.className = `badge ${getComplaintBadgeClass(complaint.status)}`;
+
+  const resolveBtn = document.getElementById('resolve-complaint-btn');
+  const isAdmin = getUserRole(auth?.currentUser) === 'admin';
+  if (resolveBtn) {
+    resolveBtn.classList.toggle('d-none', !isAdmin || (complaint.status || '').toLowerCase() === 'resolved');
+    resolveBtn.onclick = async () => {
+      if (confirm('Are you sure you want to resolve this complaint?')) {
+        await updateComplaintStatus(id, 'Resolved');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+      }
+    };
+  }
+
+  const modal = new bootstrap.Modal(modalEl);
+  modal.show();
+}
+
+async function updateComplaintStatus(id, status) {
+  if (!database) return;
+  try {
+    await database.ref(`complaints/${id}`).update({ status });
+    // Local update will happen via realtime listener
+  } catch (error) {
+    console.error('Failed to update complaint status', error);
+  }
+}
+
+function getPriorityColor(priority) {
+  const p = (priority || '').toLowerCase();
+  if (p === 'high' || p === 'urgent') return 'danger';
+  if (p === 'medium') return 'warning text-dark';
+  return 'info';
 }
 
 function getComplaintBadgeClass(status) {
@@ -369,12 +433,76 @@ function getComplaintBadgeClass(status) {
 function initForms() {
   initComplaintForms();
   initNoticeForm();
+  initAdminForms();
 
   const payButtons = document.querySelectorAll('.pay-btn');
   payButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
       alert('Redirecting to payment gateway... (Demo)');
     });
+  });
+}
+
+function initAdminForms() {
+  const addResidentForm = document.getElementById('add-resident-form');
+  if (!addResidentForm) return;
+
+  addResidentForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const statusEl = document.getElementById('add-resident-status');
+    const submitBtn = document.getElementById('add-resident-btn');
+    const formData = new FormData(addResidentForm);
+
+    setAuthStatus(statusEl, 'info', 'Creating account...');
+    submitBtn.disabled = true;
+
+    try {
+      // 1. Create the user via Backend API
+      const response = await fetch('/api/auth/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.get('email'),
+          password: formData.get('password'),
+          role: 'resident', // Default role for new accounts
+          displayName: formData.get('name')
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to create resident account');
+
+      // 2. Add resident details to Realtime Database
+      if (database) {
+        await database.ref(`residents/${data.localId}`).set({
+          name: formData.get('name'),
+          email: formData.get('email'),
+          flat: formData.get('flat'),
+          role: 'resident',
+          createdAt: new Date().toISOString()
+        });
+
+        // 3. Update total residents stat
+        const statsRef = database.ref('stats/totalResidents');
+        await statsRef.transaction((current) => (current || 0) + 1);
+      }
+
+      setAuthStatus(statusEl, 'success', 'Resident account created successfully!');
+      addResidentForm.reset();
+      
+      // Close modal after delay
+      setTimeout(() => {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('addResidentModal'));
+        if (modal) modal.hide();
+        clearAuthStatus(statusEl);
+      }, 2000);
+
+    } catch (error) {
+      console.error('[admin] add resident failed', error);
+      setAuthStatus(statusEl, 'danger', error.message);
+    } finally {
+      submitBtn.disabled = false;
+    }
   });
 }
 

@@ -48,9 +48,39 @@ router.post('/signin', async (req, res, next) => {
 
 router.post('/signup', async (req, res, next) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password, role, displayName } = req.body;
+    // 1. Create the user
     const data = await callFirebase('signUp', { email, password, returnSecureToken: true });
-    res.json({ ...data, role });
+    
+    // 2. Update the profile with role/displayName
+    if (role || displayName) {
+      await callFirebase('setAccountInfo', {
+        idToken: data.idToken,
+        displayName: role || displayName,
+        returnSecureToken: false
+      });
+    }
+
+    res.json({ ...data, role: role || displayName });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/create-user', async (req, res, next) => {
+  // This is a duplicate of signup for clarity in admin context
+  try {
+    const { email, password, role, displayName } = req.body;
+    const data = await callFirebase('signUp', { email, password, returnSecureToken: true });
+    
+    if (role || displayName) {
+      await callFirebase('setAccountInfo', {
+        idToken: data.idToken,
+        displayName: role || displayName,
+        returnSecureToken: false
+      });
+    }
+    res.json({ status: 'success', email: data.email, localId: data.localId });
   } catch (err) {
     next(err);
   }
