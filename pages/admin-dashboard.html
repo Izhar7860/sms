@@ -81,40 +81,65 @@
         <div class="container-fluid">
             <!-- Header -->
             <div class="row mb-4">
-                <div class="col">
-                    <h1 class="h3 mb-0"><i class="fas fa-tachometer-alt text-primary me-2"></i>Admin Dashboard</h1>
-                    <p class="text-muted">Welcome back! Here's what's happening in your society.</p>
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm overflow-hidden" style="background: linear-gradient(135deg, var(--primary-light) 0%, #ffffff 100%);">
+                        <div class="card-body p-4 d-flex align-items-center position-relative">
+                            <div class="me-auto z-1">
+                                <h2 class="fw-bold mb-1">Admin Dashboard <i class="fas fa-shield-alt text-primary ms-2 fs-4"></i></h2>
+                                <p class="text-muted mb-0 fs-5">Welcome back! Here's what's happening in your society.</p>
+                            </div>
+                            <div class="opacity-25 position-absolute end-0 top-50 translate-middle-y me-4 d-none d-md-block">
+                                <i class="fas fa-tachometer-alt fa-6x text-primary"></i>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Stats Cards -->
             <div class="row g-4 mb-5">
                 <div class="col-xl-3 col-md-6">
-                    <div class="card stat-card">
-                        <div class="stat-number stat-flats">125</div>
-                        <div class="stat-label">Total Flats</div>
-                        <i class="fas fa-building fa-2x text-primary-light mt-2"></i>
+                    <div class="card stat-card h-100 border-0 shadow-sm overflow-hidden position-relative" style="background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%); padding-bottom: 1rem;">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-white shadow-sm p-3" style="width: 50px; height: 50px;">
+                                <i class="fas fa-building fa-lg" style="color: #1976d2;"></i>
+                            </div>
+                            <div class="stat-label mb-0 fw-medium">Total Flats</div>
+                        </div>
+                        <div class="stat-number stat-flats text-start ms-1" style="color: #1565c0; font-size: 2.25rem;">125</div>
                     </div>
                 </div>
                 <div class="col-xl-3 col-md-6">
-                    <div class="card stat-card">
-                        <div class="stat-number stat-residents">456</div>
-                        <div class="stat-label">Total Residents</div>
-                        <i class="fas fa-users fa-2x text-primary-light mt-2"></i>
+                    <div class="card stat-card h-100 border-0 shadow-sm overflow-hidden position-relative" style="background: linear-gradient(135deg, #f3e5f5 0%, #ffffff 100%); padding-bottom: 1rem;">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-white shadow-sm p-3" style="width: 50px; height: 50px;">
+                                <i class="fas fa-users fa-lg" style="color: #7b1fa2;"></i>
+                            </div>
+                            <div class="stat-label mb-0 fw-medium">Total Residents</div>
+                        </div>
+                        <div class="stat-number stat-residents text-start ms-1" style="color: #4a148c; font-size: 2.25rem;">456</div>
                     </div>
                 </div>
                 <div class="col-xl-3 col-md-6">
-                    <div class="card stat-card">
-                        <div class="stat-number stat-pending text-warning">23</div>
-                        <div class="stat-label">Pending Payments</div>
-                        <i class="fas fa-exclamation-circle fa-2x text-warning mt-2"></i>
+                    <div class="card stat-card h-100 border-0 shadow-sm overflow-hidden position-relative" style="background: linear-gradient(135deg, #fff3e0 0%, #ffffff 100%); padding-bottom: 1rem;">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-white shadow-sm p-3" style="width: 50px; height: 50px;">
+                                <i class="fas fa-exclamation-circle fa-lg" style="color: #f57c00;"></i>
+                            </div>
+                            <div class="stat-label mb-0 fw-medium">Pending Payments</div>
+                        </div>
+                        <div class="stat-number stat-pending text-start ms-1" style="color: #e65100; font-size: 2.25rem;">23</div>
                     </div>
                 </div>
                 <div class="col-xl-3 col-md-6">
-                    <div class="card stat-card">
-                        <div class="stat-number stat-complaints text-danger">12</div>
-                        <div class="stat-label">Open Complaints</div>
-                        <i class="fas fa-tools fa-2x text-danger mt-2"></i>
+                    <div class="card stat-card h-100 border-0 shadow-sm overflow-hidden position-relative" style="background: linear-gradient(135deg, #ffebee 0%, #ffffff 100%); padding-bottom: 1rem;">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-white shadow-sm p-3" style="width: 50px; height: 50px;">
+                                <i class="fas fa-tools fa-lg" style="color: #d32f2f;"></i>
+                            </div>
+                            <div class="stat-label mb-0 fw-medium">Open Complaints</div>
+                        </div>
+                        <div class="stat-number stat-complaints text-start ms-1" style="color: #b71c1c; font-size: 2.25rem;">12</div>
                     </div>
                 </div>
             </div>

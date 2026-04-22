@@ -65,22 +65,29 @@
     <!-- Main Content -->
     <main class="main-content">
         <div class="container-fluid complaints-shell">
-            <section class="complaints-hero mb-4">
-                <div>
-                    <span class="hero-kicker"><i class="fas fa-shield-heart me-2"></i>Resident Support Desk</span>
-                    <h1 class="h3 mb-2"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Complaint Management</h1>
-                    <p class="text-muted mb-0">Track open issues, review residents affected, and move urgent cases toward resolution with a clearer workflow.</p>
-                </div>
-                <div class="complaints-hero-actions">
-                    <div class="hero-note">
-                        <span class="hero-note-label">Response goal</span>
-                        <strong>Review new complaints daily</strong>
+            <!-- Welcome Banner -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm overflow-hidden" style="background: linear-gradient(135deg, #fff3e0 0%, #ffffff 100%);">
+                        <div class="card-body p-4 d-flex align-items-center position-relative">
+                            <div class="me-auto z-1">
+                                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-3 mb-2"><i class="fas fa-shield-heart me-2"></i>Resident Support Desk</span>
+                                <h2 class="fw-bold mb-1">Complaint Management <i class="fas fa-exclamation-triangle text-warning ms-2 fs-4"></i></h2>
+                                <p class="text-muted mb-0 fs-5">Track open issues and move urgent cases toward resolution.</p>
+                            </div>
+                            <div class="z-1 d-flex flex-column align-items-end me-4 d-none d-md-flex">
+                                <span class="text-muted small mb-2">Response goal: <strong>Review daily</strong></span>
+                                <a href="#new-complaint-card" class="btn btn-primary rounded-pill px-4 shadow-sm">
+                                    <i class="fas fa-plus me-2"></i>Log Complaint
+                                </a>
+                            </div>
+                            <div class="opacity-10 position-absolute end-0 top-50 translate-middle-y me-4 d-none d-lg-block" style="pointer-events: none;">
+                                <i class="fas fa-tools fa-6x text-warning"></i>
+                            </div>
+                        </div>
                     </div>
-                    <a href="#new-complaint-card" class="btn btn-primary">
-                        <i class="fas fa-plus me-2"></i>Log Complaint
-                    </a>
                 </div>
-            </section>
+            </div>
 
             <!-- Complaint Stats -->
             <div class="row g-4 mb-5">
