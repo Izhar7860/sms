@@ -35,11 +35,12 @@ body {
   top: 0;
   height: 100vh;
   width: var(--sidebar-width);
-  background: linear-gradient(180deg, var(--primary-color) 0%, #e8ac65 75%);
+  background: linear-gradient(180deg, #1e1e2d 0%, #151521 100%);
   color: white;
   transition: width 0.3s ease;
   z-index: 1000;
   overflow-y: auto;
+  box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
 }
 
 .sidebar.collapsed {
@@ -49,7 +50,7 @@ body {
 .sidebar-header {
   padding: 1.5rem 1rem;
   text-align: center;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
 .sidebar-header h3 {
@@ -57,6 +58,11 @@ body {
   margin: 0;
   white-space: nowrap;
   opacity: 1;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: linear-gradient(90deg, var(--primary-color), #f8c9b3);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .sidebar-header.collapsed h3 {
@@ -65,27 +71,35 @@ body {
 
 .sidebar-nav {
   list-style: none;
-  padding: 1rem 0;
+  padding: 1.5rem 0.75rem;
 }
 
 .sidebar-nav li {
-  margin: 0.25rem 0;
+  margin: 0.35rem 0;
 }
 
 .nav-link {
   display: flex;
   align-items: center;
   padding: 0.875rem 1rem;
-  color: rgba(255,255,255,0.8);
+  color: rgba(255,255,255,0.65);
   text-decoration: none;
-  transition: all 0.3s ease;
+  border-radius: 0.5rem;
+  transition: all 0.25s ease;
   white-space: nowrap;
 }
 
-.nav-link:hover,
-.nav-link.active {
-  background-color: rgba(255,255,255,0.2);
+.nav-link:hover {
+  background-color: rgba(255,255,255,0.08);
   color: white;
+  transform: translateX(4px);
+}
+
+.nav-link.active {
+  background: linear-gradient(90deg, var(--primary-color) 0%, #b58062 100%);
+  color: white;
+  box-shadow: 0 4px 10px rgba(203, 153, 126, 0.3);
+  font-weight: 500;
 }
 
 .nav-icon {
@@ -105,9 +119,19 @@ body {
 
 .logout-link {
   margin-top: auto;
-  border-top: 1px solid rgba(255,255,255,0.1);
-  margin-top: auto;
-  padding-top: 1rem;
+  border-top: none;
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+  margin-left: 0.75rem;
+  margin-right: 0.75rem;
+  margin-bottom: 1rem;
+  border-radius: 0.5rem;
+}
+
+.logout-link:hover {
+  background: rgba(220, 53, 69, 0.2);
+  color: #dc3545;
+  transform: translateX(4px);
 }
 
 /* Top Navbar */

@@ -344,28 +344,52 @@ function renderComplaints() {
   if (!complaintsTableBody) return;
 
   complaintsTableBody.innerHTML = '';
+  if (!window.SMSData.complaints.length) {
+    complaintsTableBody.innerHTML = `
+      <tr>
+        <td colspan="5" class="text-center text-muted py-5">
+          <i class="fas fa-inbox d-block mb-3 fs-3 text-secondary"></i>
+          No complaints have been logged yet.
+        </td>
+      </tr>
+    `;
+  }
+
   window.SMSData.complaints.forEach((complaint, index) => {
     const row = document.createElement('tr');
     const complaintId = complaint.id || index;
+    const subject = complaint.title || complaint.subject || 'Complaint';
+    const resident = complaint.resident || 'Resident';
+    const flat = complaint.flat || '-';
     row.innerHTML = `
-      <td>#${String(index + 1).padStart(3, '0')}</td>
-      <td>${escapeHtml(complaint.title || complaint.subject || 'Complaint')}</td>
-      <td>${escapeHtml(complaint.resident || 'Resident')}</td>
-      <td>${escapeHtml(complaint.flat || '-')}</td>
+      <td>
+        <div class="complaint-id">${escapeHtml(getComplaintReference(complaintId, index))}</div>
+        <div class="complaint-title-row">
+          <h6 class="complaint-title">${escapeHtml(subject)}</h6>
+          <span class="badge ${getPriorityBadgeClass(complaint.priority)}">${escapeHtml(complaint.priority || 'Medium')}</span>
+        </div>
+        <p class="complaint-snippet">${escapeHtml(getComplaintSnippet(complaint.description))}</p>
+      </td>
+      <td>
+        <div class="complaint-resident">${escapeHtml(resident)}</div>
+        <div class="complaint-flat">Flat ${escapeHtml(flat)}</div>
+      </td>
       <td><span class="badge ${getComplaintBadgeClass(complaint.status)}">${escapeHtml(complaint.status || 'Pending')}</span></td>
-      <td>${formatShortDate(complaint.date)}</td>
-      <td><button class="btn btn-sm btn-outline-secondary view-complaint-btn" type="button" data-id="${complaintId}">View</button></td>
+      <td><span class="complaint-date">${formatShortDate(complaint.date)}</span></td>
+      <td><button class="btn btn-sm btn-outline-secondary view-complaint-btn" type="button" data-id="${complaintId}"><i class="fas fa-eye me-1"></i>View Case</button></td>
     `;
     complaintsTableBody.appendChild(row);
   });
 
-  // Attach listeners via delegation
-  complaintsTableBody.addEventListener('click', (e) => {
-    const btn = e.target.closest('.view-complaint-btn');
-    if (btn) {
-      showComplaintDetails(btn.dataset.id);
-    }
-  });
+  if (complaintsTableBody.dataset.bound !== 'true') {
+    complaintsTableBody.addEventListener('click', (e) => {
+      const btn = e.target.closest('.view-complaint-btn');
+      if (btn) {
+        showComplaintDetails(btn.dataset.id);
+      }
+    });
+    complaintsTableBody.dataset.bound = 'true';
+  }
 }
 
 function showComplaintDetails(id) {
@@ -375,15 +399,17 @@ function showComplaintDetails(id) {
   const modalEl = document.getElementById('complaintDetailsModal');
   if (!modalEl) return;
 
+  document.getElementById('detail-id').textContent = getComplaintReference(id, window.SMSData.complaints.indexOf(complaint));
   document.getElementById('detail-subject').textContent = complaint.title || complaint.subject || 'Complaint';
   document.getElementById('detail-resident').textContent = complaint.resident || 'Resident';
   document.getElementById('detail-flat').textContent = complaint.flat || '-';
   document.getElementById('detail-description').textContent = complaint.description || 'No description provided.';
   document.getElementById('detail-date').textContent = formatDate(complaint.date);
+  document.getElementById('detail-status-copy').textContent = complaint.status || 'Pending';
 
   const priorityEl = document.getElementById('detail-priority');
   priorityEl.textContent = complaint.priority || 'Medium';
-  priorityEl.className = `badge bg-${getPriorityColor(complaint.priority)}`;
+  priorityEl.className = `badge ${getPriorityBadgeClass(complaint.priority)}`;
 
   const statusEl = document.getElementById('detail-status');
   statusEl.textContent = complaint.status || 'Pending';
@@ -423,11 +449,27 @@ function getPriorityColor(priority) {
   return 'info';
 }
 
+function getPriorityBadgeClass(priority) {
+  return `bg-${getPriorityColor(priority)}`;
+}
+
 function getComplaintBadgeClass(status) {
   const normalizedStatus = (status || '').toLowerCase();
   if (normalizedStatus === 'resolved') return 'bg-success';
   if (normalizedStatus === 'in progress') return 'bg-primary';
   return 'bg-warning text-dark';
+}
+
+function getComplaintReference(id, index) {
+  if (typeof id === 'string' && id.trim()) return `Case ${id}`;
+  const safeIndex = Number.isFinite(index) ? index + 1 : 1;
+  return `Case #${String(safeIndex).padStart(3, '0')}`;
+}
+
+function getComplaintSnippet(description) {
+  const value = (description || '').trim();
+  if (!value) return 'No description provided yet.';
+  return value.length > 110 ? `${value.slice(0, 107)}...` : value;
 }
 
 function initForms() {
