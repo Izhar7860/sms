@@ -116,6 +116,10 @@ function initSidebar() {
   const sidebar = document.querySelector('.sidebar');
   const toggleBtn = document.getElementById('sidebar-toggle');
 
+  if (window.innerWidth <= 768 && sidebar) {
+    sidebar.classList.add('collapsed');
+  }
+
   if (toggleBtn && sidebar) {
     toggleBtn.addEventListener('click', () => {
       sidebar.classList.toggle('collapsed');
