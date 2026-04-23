@@ -6,7 +6,7 @@
     <title>Complaints - Society Management System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="/css/style.css?v=2">
 </head>
 <body data-auth-required="true">
     <!-- Sidebar -->
@@ -64,37 +64,53 @@
 
     <!-- Main Content -->
     <main class="main-content">
-        <div class="container-fluid">
-            <!-- Header -->
+        <div class="container-fluid complaints-shell">
+            <!-- Welcome Banner -->
             <div class="row mb-4">
-                <div class="col">
-                    <h1 class="h3 mb-0"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Complaint Management</h1>
-                    <p class="text-muted">Track and resolve resident complaints efficiently.</p>
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm overflow-hidden" style="background: linear-gradient(135deg, #fff3e0 0%, #ffffff 100%);">
+                        <div class="card-body p-4 d-flex align-items-center position-relative">
+                            <div class="me-auto z-1">
+                                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-3 mb-2"><i class="fas fa-shield-heart me-2"></i>Resident Support Desk</span>
+                                <h2 class="fw-bold mb-1">Complaint Management <i class="fas fa-exclamation-triangle text-warning ms-2 fs-4"></i></h2>
+                                <p class="text-muted mb-0 fs-5">Track open issues and move urgent cases toward resolution.</p>
+                            </div>
+                            <div class="z-1 d-flex flex-column align-items-end me-4 d-none d-md-flex">
+                                <span class="text-muted small mb-2">Response goal: <strong>Review daily</strong></span>
+                                <a href="#new-complaint-card" class="btn btn-primary rounded-pill px-4 shadow-sm">
+                                    <i class="fas fa-plus me-2"></i>Log Complaint
+                                </a>
+                            </div>
+                            <div class="opacity-10 position-absolute end-0 top-50 translate-middle-y me-4 d-none d-lg-block" style="pointer-events: none;">
+                                <i class="fas fa-tools fa-6x text-warning"></i>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Complaint Stats -->
             <div class="row g-4 mb-5">
                 <div class="col-md-3">
-                    <div class="card text-center stat-card">
+                    <div class="card text-center stat-card stat-card--complaint">
                         <div class="stat-number text-info" data-complaint-stat="total">28</div>
                         <div class="stat-label">Total Complaints</div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card text-center stat-card">
+                    <div class="card text-center stat-card stat-card--complaint">
                         <div class="stat-number text-warning" data-complaint-stat="pending">8</div>
                         <div class="stat-label">Pending</div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card text-center stat-card">
+                    <div class="card text-center stat-card stat-card--complaint">
                         <div class="stat-number text-primary" data-complaint-stat="inProgress">15</div>
                         <div class="stat-label">In Progress</div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card text-center stat-card">
+                    <div class="card text-center stat-card stat-card--complaint">
                         <div class="stat-number text-success" data-complaint-stat="resolved">5</div>
                         <div class="stat-label">Resolved</div>
                     </div>
@@ -104,31 +120,32 @@
             <div class="row g-4">
                 <!-- New Complaint Form -->
                 <div class="col-lg-4">
-                    <div class="card sticky-top" style="top: 2rem;">
+                    <div class="card complaint-form-card sticky-top" id="new-complaint-card" style="top: 2rem;">
                         <div class="card-header">
-                            <h5 class="mb-0"><i class="fas fa-plus me-2"></i>New Complaint</h5>
+                            <h5 class="mb-1"><i class="fas fa-plus me-2"></i>New Complaint</h5>
+                            <p class="mb-0 small text-muted">Capture enough detail for the admin team to act without chasing basic information.</p>
                         </div>
                         <div class="card-body">
                             <form data-complaint-form>
                                 <div class="mb-3">
                                     <label class="form-label">Resident Name</label>
-                                    <select name="resident" class="form-select">
-                                        <option>Select Resident</option>
+                                    <select name="resident" class="form-select" required>
+                                        <option value="">Select Resident</option>
                                         <option>Amit Sharma</option>
                                         <option>Priya Patel</option>
                                     </select>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Flat No.</label>
-                                    <input type="text" name="flat" class="form-control" value="3A">
+                                    <input type="text" name="flat" class="form-control" value="3A" placeholder="e.g. 3A">
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Subject</label>
-                                    <input type="text" name="subject" class="form-control" placeholder="Brief title">
+                                    <input type="text" name="subject" class="form-control" placeholder="Brief title" required>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Description</label>
-                                    <textarea name="description" class="form-control" rows="3" placeholder="Describe the issue..."></textarea>
+                                    <textarea name="description" class="form-control" rows="4" placeholder="Describe the issue, impact, and any urgent context..." required></textarea>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Priority</label>
@@ -139,6 +156,10 @@
                                         <option>Urgent</option>
                                     </select>
                                 </div>
+                                <div class="complaint-form-tip">
+                                    <i class="fas fa-circle-info"></i>
+                                    <span>Urgent complaints should include the affected area and whether the issue blocks access or creates a safety risk.</span>
+                                </div>
                                 <button type="submit" class="btn btn-primary w-100">Submit Complaint</button>
                             </form>
                         </div>
@@ -147,21 +168,25 @@
 
                 <!-- Complaints List -->
                 <div class="col-lg-8">
-                    <div class="card">
+                    <div class="card complaints-list-card">
                         <div class="card-header">
-                            <h5 class="mb-0">Recent Complaints</h5>
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div>
+                                    <h5 class="mb-1">Recent Complaints</h5>
+                                    <p class="mb-0 small text-muted">Prioritized view of current resident issues and their latest status.</p>
+                                </div>
+                                <span class="complaints-table-note">Click any complaint to inspect the full case details.</span>
+                            </div>
                         </div>
                         <div class="card-body p-0">
                             <div class="table-responsive">
-                                <table class="table mb-0">
+                                <table class="table complaints-table mb-0 align-middle">
                                     <thead class="table-light">
                                         <tr>
-                                            <th>ID</th>
-                                            <th>Subject</th>
+                                            <th>Complaint</th>
                                             <th>Resident</th>
-                                            <th>Flat</th>
                                             <th>Status</th>
-                                            <th>Date</th>
+                                            <th>Updated</th>
                                             <th>Action</th>
                                         </tr>
                                     </thead>
@@ -175,11 +200,79 @@
         </div>
     </main>
 
+    <!-- Complaint Details Modal -->
+    <div class="modal fade" id="complaintDetailsModal" tabindex="-1" aria-labelledby="complaintDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content complaint-modal">
+                <div class="modal-header">
+                    <div>
+                        <span class="complaint-modal-kicker" id="detail-id">Complaint</span>
+                        <h5 class="modal-title" id="complaintDetailsModalLabel">Complaint Details</h5>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="complaint-details-content" class="complaint-detail-layout">
+                        <section class="complaint-detail-main">
+                            <div class="complaint-detail-panel complaint-detail-summary">
+                                <div class="complaint-detail-badges">
+                                    <span id="detail-status" class="badge"></span>
+                                    <span id="detail-priority" class="badge bg-info"></span>
+                                </div>
+                                <h4 id="detail-subject" class="complaint-detail-title"></h4>
+                                <p id="detail-description" class="complaint-detail-description"></p>
+                            </div>
+                            <div class="complaint-detail-panel">
+                                <h6 class="complaint-detail-section-title">Issue Summary</h6>
+                                <div class="complaint-detail-grid">
+                                    <div class="detail-item">
+                                        <span class="detail-label">Resident</span>
+                                        <span id="detail-resident" class="detail-value"></span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Flat</span>
+                                        <span id="detail-flat" class="detail-value"></span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Submitted</span>
+                                        <span id="detail-date" class="detail-value"></span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Latest status</span>
+                                        <span id="detail-status-copy" class="detail-value"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        <aside class="complaint-detail-sidebar">
+                            <div class="complaint-detail-panel">
+                                <h6 class="complaint-detail-section-title">Resolution Guide</h6>
+                                <ul class="complaint-checklist">
+                                    <li>Confirm the issue details with the resident if the description is incomplete.</li>
+                                    <li>Assign maintenance or security follow-up based on urgency.</li>
+                                    <li>Mark resolved only after the resident confirms closure.</li>
+                                </ul>
+                            </div>
+                            <div class="complaint-detail-panel complaint-detail-note">
+                                <span class="detail-label">Case Note</span>
+                                <p class="mb-0">Use the complaint modal to review context before updating the status. High-priority cases should be handled before routine maintenance items.</p>
+                            </div>
+                        </aside>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-success d-none" id="resolve-complaint-btn">Mark as Resolved</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-    <script src="../js/firebase-config.js"></script>
+    <script src="/js/firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="../js/main.js"></script>
+    <script src="/js/main.js"></script>
 </body>
 </html>

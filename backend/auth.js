@@ -26,7 +26,18 @@ async function callFirebase(action, payload) {
     body: JSON.stringify(payload)
   });
 
-  const data = await response.json();
+  const contentType = response.headers.get('content-type');
+  let data;
+  
+  if (contentType && contentType.includes('application/json')) {
+    data = await response.json();
+  } else {
+    const text = await response.text();
+    const error = new Error(`Firebase Auth request failed with status ${response.status}: ${text.substring(0, 100)}...`);
+    error.status = response.status;
+    throw error;
+  }
+
   if (!response.ok) {
     const error = new Error(data.error?.message || 'Firebase Auth request failed');
     error.status = response.status;
@@ -48,9 +59,39 @@ router.post('/signin', async (req, res, next) => {
 
 router.post('/signup', async (req, res, next) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password, role, displayName } = req.body;
+    // 1. Create the user
     const data = await callFirebase('signUp', { email, password, returnSecureToken: true });
-    res.json({ ...data, role });
+    
+    // 2. Update the profile with role/displayName
+    if (role || displayName) {
+      await callFirebase('setAccountInfo', {
+        idToken: data.idToken,
+        displayName: role || displayName,
+        returnSecureToken: false
+      });
+    }
+
+    res.json({ ...data, role: role || displayName });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/create-user', async (req, res, next) => {
+  // This is a duplicate of signup for clarity in admin context
+  try {
+    const { email, password, role, displayName } = req.body;
+    const data = await callFirebase('signUp', { email, password, returnSecureToken: true });
+    
+    if (role || displayName) {
+      await callFirebase('setAccountInfo', {
+        idToken: data.idToken,
+        displayName: role || displayName,
+        returnSecureToken: false
+      });
+    }
+    res.json({ status: 'success', email: data.email, localId: data.localId });
   } catch (err) {
     next(err);
   }
