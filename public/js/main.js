@@ -120,11 +120,12 @@ window.addEventListener('beforeunload', detachDatabaseListeners);
 function initSidebar() {
   const sidebar = document.querySelector('.sidebar');
   const toggleBtn = document.getElementById('sidebar-toggle');
+  const backdrop = document.getElementById('sidebar-backdrop');
 
   if (!sidebar) return;
 
   const syncSidebarForViewport = () => {
-    if (window.innerWidth <= 768) {
+    if (window.innerWidth <= 992) {
       sidebar.classList.add('collapsed');
     } else {
       sidebar.classList.remove('collapsed');
@@ -133,9 +134,15 @@ function initSidebar() {
 
   syncSidebarForViewport();
 
-  if (toggleBtn && sidebar) {
+  if (toggleBtn) {
     toggleBtn.addEventListener('click', () => {
       sidebar.classList.toggle('collapsed');
+    });
+  }
+
+  if (backdrop) {
+    backdrop.addEventListener('click', () => {
+      sidebar.classList.add('collapsed');
     });
   }
 
@@ -145,7 +152,7 @@ function initSidebar() {
     const isClickInsideSidebar = sidebar.contains(event.target);
     const isToggleClick = event.target.id === 'sidebar-toggle' || event.target.closest('#sidebar-toggle');
 
-    if (!isClickInsideSidebar && !isToggleClick && window.innerWidth <= 768) {
+    if (!isClickInsideSidebar && !isToggleClick && window.innerWidth <= 992) {
       sidebar.classList.add('collapsed');
     }
   });
@@ -940,12 +947,22 @@ function updateAuthProfile(user) {
     roleElement.textContent = capitalize(role);
   }
 
-  // Toggle visibility of admin-only menu items
+  // Role-based sidebar link visibility
   const adminLinks = document.querySelectorAll('.nav-link[href*="admin-dashboard"]');
+  const residentLinks = document.querySelectorAll('.nav-link[href*="resident-dashboard"]');
+  
   adminLinks.forEach(link => {
     const parentLi = link.closest('li');
     if (parentLi) {
       parentLi.style.display = role === 'admin' ? 'block' : 'none';
+    }
+  });
+
+  residentLinks.forEach(link => {
+    const parentLi = link.closest('li');
+    if (parentLi) {
+      // Hide Resident Dashboard for Admins, show for Residents
+      parentLi.style.display = role === 'resident' ? 'block' : 'none';
     }
   });
 }
