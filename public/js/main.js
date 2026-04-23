@@ -7,6 +7,7 @@ const defaultSMSData = {
     pendingPayments: 23,
     complaints: 12
   },
+  residents: [],
   payments: [
     { id: 1, resident: 'Amit Sharma', month: 'Jan 2024', amount: 5000, status: 'paid' },
     { id: 2, resident: 'Priya Patel', month: 'Jan 2024', amount: 5000, status: 'pending' },
@@ -84,6 +85,7 @@ const auth = hasFirebaseConfig
   : null;
 
 const hasDatabaseConfig = Boolean(
+
   hasFirebaseConfig &&
   typeof firebase.database === 'function' &&
   inferredDatabaseUrl
@@ -100,6 +102,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   initSidebar();
   setActiveNavLink();
   initForms();
+  
+  // Apply immediate UI state from sessionStorage to prevent flicker
+  applyInitialAuthState();
 
   await hydrateAppData();
 
@@ -115,23 +120,42 @@ window.addEventListener('beforeunload', detachDatabaseListeners);
 function initSidebar() {
   const sidebar = document.querySelector('.sidebar');
   const toggleBtn = document.getElementById('sidebar-toggle');
+  const backdrop = document.getElementById('sidebar-backdrop');
 
-  if (toggleBtn && sidebar) {
+  if (!sidebar) return;
+
+  const syncSidebarForViewport = () => {
+    if (window.innerWidth <= 992) {
+      sidebar.classList.add('collapsed');
+    } else {
+      sidebar.classList.remove('collapsed');
+    }
+  };
+
+  syncSidebarForViewport();
+
+  if (toggleBtn) {
     toggleBtn.addEventListener('click', () => {
       sidebar.classList.toggle('collapsed');
     });
   }
 
-  if (sidebar) {
-    document.addEventListener('click', (event) => {
-      const isClickInsideSidebar = sidebar.contains(event.target);
-      const isToggleClick = event.target.id === 'sidebar-toggle' || event.target.closest('#sidebar-toggle');
-
-      if (!isClickInsideSidebar && !isToggleClick && window.innerWidth <= 768) {
-        sidebar.classList.add('collapsed');
-      }
+  if (backdrop) {
+    backdrop.addEventListener('click', () => {
+      sidebar.classList.add('collapsed');
     });
   }
+
+  window.addEventListener('resize', syncSidebarForViewport);
+
+  document.addEventListener('click', (event) => {
+    const isClickInsideSidebar = sidebar.contains(event.target);
+    const isToggleClick = event.target.id === 'sidebar-toggle' || event.target.closest('#sidebar-toggle');
+
+    if (!isClickInsideSidebar && !isToggleClick && window.innerWidth <= 992) {
+      sidebar.classList.add('collapsed');
+    }
+  });
 }
 
 function setActiveNavLink() {
@@ -156,8 +180,19 @@ async function hydrateAppData() {
       renderAppData();
     });
 
-    attachRealtimeCollection('payments', defaultSMSData.payments, (value) => {
+    attachRealtimeCollection('residents', defaultSMSData.residents, (value, rawValue) => {
+      window.SMSData.residents = normalizeCollection(value, defaultSMSData.residents);
+      if (rawValue) {
+        window.SMSData.stats.totalResidents = window.SMSData.residents.length;
+      }
+      renderAppData();
+    });
+
+    attachRealtimeCollection('payments', defaultSMSData.payments, (value, rawValue) => {
       window.SMSData.payments = normalizeCollection(value, defaultSMSData.payments);
+      if (rawValue) {
+        window.SMSData.stats.pendingPayments = countPendingPayments(window.SMSData.payments);
+      }
       renderAppData();
     });
 
@@ -187,12 +222,13 @@ function attachRealtimeCollection(path, fallbackValue, onValue) {
   const listener = ref.on(
     'value',
     (snapshot) => {
-      const value = snapshot.val();
-      onValue(value ?? fallbackValue);
+      const rawValue = snapshot.val();
+      const value = rawValue ?? getRealtimeEmptyValue(fallbackValue);
+      onValue(value, rawValue);
     },
     (error) => {
       console.warn(`[database] failed to subscribe to ${path}`, error);
-      onValue(fallbackValue);
+      onValue(getRealtimeEmptyValue(fallbackValue), null);
     }
   );
 
@@ -204,6 +240,11 @@ function detachDatabaseListeners() {
     ref.off('value', listener);
   });
   databaseListeners.length = 0;
+}
+
+function getRealtimeEmptyValue(fallbackValue) {
+  if (Array.isArray(fallbackValue)) return [];
+  return fallbackValue;
 }
 
 function renderAppData() {
@@ -288,6 +329,12 @@ function summarizeComplaints(complaints) {
   );
 }
 
+function countPendingPayments(payments) {
+  return payments.reduce((count, payment) => {
+    return count + (((payment.status || '').toLowerCase() === 'pending') ? 1 : 0);
+  }, 0);
+}
+
 function renderParkingGrid() {
   const container = document.querySelector('.parking-grid');
   if (!container) return;
@@ -344,19 +391,142 @@ function renderComplaints() {
   if (!complaintsTableBody) return;
 
   complaintsTableBody.innerHTML = '';
+  if (!window.SMSData.complaints.length) {
+    complaintsTableBody.innerHTML = `
+      <tr>
+        <td colspan="5" class="text-center text-muted py-5">
+          <i class="fas fa-inbox d-block mb-3 fs-3 text-secondary"></i>
+          No complaints have been logged yet.
+        </td>
+      </tr>
+    `;
+  }
+
   window.SMSData.complaints.forEach((complaint, index) => {
     const row = document.createElement('tr');
+    const complaintId = complaint.id || index;
+    const subject = complaint.title || complaint.subject || 'Complaint';
+    const resident = complaint.resident || 'Resident';
+    const flat = complaint.flat || '-';
+    
     row.innerHTML = `
-      <td>#${String(index + 1).padStart(3, '0')}</td>
-      <td>${escapeHtml(complaint.title || complaint.subject || 'Complaint')}</td>
-      <td>${escapeHtml(complaint.resident || 'Resident')}</td>
-      <td>${escapeHtml(complaint.flat || '-')}</td>
-      <td><span class="badge ${getComplaintBadgeClass(complaint.status)}">${escapeHtml(complaint.status || 'Pending')}</span></td>
-      <td>${formatShortDate(complaint.date)}</td>
-      <td><button class="btn btn-sm btn-outline-secondary" type="button">View</button></td>
+      <td>
+        <div class="d-flex flex-column">
+          <span class="text-xs fw-bold text-uppercase text-secondary mb-1" style="font-size: 0.7rem; letter-spacing: 0.5px;">
+            ${escapeHtml(getComplaintReference(complaintId, index))}
+          </span>
+          <h6 class="mb-1 fw-bold text-dark">${escapeHtml(subject)}</h6>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge ${getPriorityBadgeClass(complaint.priority)} rounded-pill" style="font-size: 0.65rem;">
+              ${escapeHtml(complaint.priority || 'Medium')}
+            </span>
+            <span class="text-muted small text-truncate" style="max-width: 250px;">
+              ${escapeHtml(getComplaintSnippet(complaint.description))}
+            </span>
+          </div>
+        </div>
+      </td>
+      <td>
+        <div class="d-flex flex-column">
+          <span class="fw-medium text-dark">${escapeHtml(resident)}</span>
+          <span class="text-muted small">Flat ${escapeHtml(flat)}</span>
+        </div>
+      </td>
+      <td>
+        <span class="badge ${getComplaintBadgeClass(complaint.status)} rounded-pill px-3">
+          ${escapeHtml(complaint.status || 'Pending')}
+        </span>
+      </td>
+      <td>
+        <div class="text-muted small">
+          ${formatShortDate(complaint.date)}
+        </div>
+      </td>
+      <td>
+        <button class="btn btn-sm btn-light border rounded-pill px-3 view-complaint-btn" type="button" data-id="${complaintId}">
+          <i class="fas fa-eye me-1 text-primary"></i>View Case
+        </button>
+      </td>
     `;
     complaintsTableBody.appendChild(row);
   });
+
+  if (complaintsTableBody.dataset.bound !== 'true') {
+    complaintsTableBody.addEventListener('click', (e) => {
+      const btn = e.target.closest('.view-complaint-btn');
+      if (btn) {
+        showComplaintDetails(btn.dataset.id);
+      }
+    });
+    complaintsTableBody.dataset.bound = 'true';
+  }
+}
+
+function showComplaintDetails(id) {
+  const complaint = window.SMSData.complaints.find((c) => (c.id || window.SMSData.complaints.indexOf(c)).toString() === id.toString());
+  if (!complaint) return;
+
+  const modalEl = document.getElementById('complaintDetailsModal');
+  if (!modalEl) return;
+
+  document.getElementById('detail-id').textContent = getComplaintReference(id, window.SMSData.complaints.indexOf(complaint));
+  document.getElementById('detail-subject').textContent = complaint.title || complaint.subject || 'Complaint';
+  document.getElementById('detail-resident').textContent = complaint.resident || 'Resident';
+  document.getElementById('detail-flat').textContent = complaint.flat || '-';
+  document.getElementById('detail-description').textContent = complaint.description || 'No description provided.';
+  document.getElementById('detail-date').textContent = formatDate(complaint.date);
+  document.getElementById('detail-status-copy').textContent = complaint.status || 'Pending';
+
+  const priorityEl = document.getElementById('detail-priority');
+  priorityEl.textContent = complaint.priority || 'Medium';
+  priorityEl.className = `badge ${getPriorityBadgeClass(complaint.priority)}`;
+
+  const statusEl = document.getElementById('detail-status');
+  statusEl.textContent = complaint.status || 'Pending';
+  statusEl.className = `badge ${getComplaintBadgeClass(complaint.status)}`;
+
+  const resolveBtn = document.getElementById('resolve-complaint-btn');
+  const isAdmin = getUserRole(auth?.currentUser) === 'admin';
+  if (resolveBtn) {
+    resolveBtn.classList.toggle('d-none', !isAdmin || (complaint.status || '').toLowerCase() === 'resolved');
+    resolveBtn.onclick = async () => {
+      if (!confirm('Are you sure you want to resolve this complaint?')) return;
+
+      try {
+        await updateComplaintStatus(id, 'Resolved');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+        showToast('Complaint marked as resolved.', 'success');
+      } catch (error) {
+        showToast(error.message || 'Failed to update complaint status.', 'danger');
+      }
+    };
+  }
+
+  const modal = new bootstrap.Modal(modalEl);
+  modal.show();
+}
+
+async function updateComplaintStatus(id, status) {
+  ensureDatabaseAvailable('update complaint status');
+  try {
+    await database.ref(`complaints/${id}`).update({ status });
+    // Local update will happen via realtime listener
+  } catch (error) {
+    console.error('Failed to update complaint status', error);
+    throw new Error('Unable to update complaint status in Firebase.');
+  }
+}
+
+function getPriorityColor(priority) {
+  const p = (priority || '').toLowerCase();
+  if (p === 'high' || p === 'urgent') return 'danger';
+  if (p === 'medium') return 'warning text-dark';
+  return 'info';
+}
+
+function getPriorityBadgeClass(priority) {
+  return `bg-${getPriorityColor(priority)}`;
 }
 
 function getComplaintBadgeClass(status) {
@@ -366,15 +536,88 @@ function getComplaintBadgeClass(status) {
   return 'bg-warning text-dark';
 }
 
+function getComplaintReference(id, index) {
+  if (typeof id === 'string' && id.trim()) {
+    // If it's a long Firebase ID, show a shorter version
+    const displayId = id.length > 10 ? id.substring(0, 8).toUpperCase() : id;
+    return `Case #${displayId}`;
+  }
+  const safeIndex = Number.isFinite(index) ? index + 1 : 1;
+  return `Case #${String(safeIndex).padStart(3, '0')}`;
+}
+
+function getComplaintSnippet(description) {
+  const value = (description || '').trim();
+  if (!value) return 'No description provided yet.';
+  return value.length > 110 ? `${value.slice(0, 107)}...` : value;
+}
+
 function initForms() {
   initComplaintForms();
   initNoticeForm();
+  initAdminForms();
 
   const payButtons = document.querySelectorAll('.pay-btn');
   payButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
-      alert('Redirecting to payment gateway... (Demo)');
+      showToast('Redirecting to payment gateway... (Demo)', 'info');
     });
+  });
+}
+
+function initAdminForms() {
+  const addResidentForm = document.getElementById('add-resident-form');
+  if (!addResidentForm) return;
+
+  addResidentForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const statusEl = document.getElementById('add-resident-status');
+    const submitBtn = document.getElementById('add-resident-btn');
+    const formData = new FormData(addResidentForm);
+
+    setAuthStatus(statusEl, 'info', 'Creating account...');
+    submitBtn.disabled = true;
+
+    try {
+      // 1. Create the user via Backend API
+      const response = await fetch('/api/auth/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.get('email'),
+          password: formData.get('password'),
+          role: 'resident', // Default role for new accounts
+          displayName: formData.get('name')
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to create resident account');
+
+      // 2. Add resident details to Realtime Database
+      await createResidentProfile(data.localId, {
+        name: formData.get('name'),
+        email: formData.get('email'),
+        flat: formData.get('flat'),
+        role: 'resident'
+      });
+
+      setAuthStatus(statusEl, 'success', 'Resident account created successfully!');
+      addResidentForm.reset();
+      
+      // Close modal after delay
+      setTimeout(() => {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('addResidentModal'));
+        if (modal) modal.hide();
+        clearAuthStatus(statusEl);
+      }, 2000);
+
+    } catch (error) {
+      console.error('[admin] add resident failed', error);
+      setAuthStatus(statusEl, 'danger', error.message);
+    } finally {
+      submitBtn.disabled = false;
+    }
   });
 }
 
@@ -384,24 +627,25 @@ function initComplaintForms() {
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
 
-      const formData = new FormData(form);
-      const complaint = {
-        title: formData.get('subject')?.toString().trim() || 'Complaint',
-        description: formData.get('description')?.toString().trim() || '',
-        resident: formData.get('resident')?.toString().trim() || auth?.currentUser?.email || 'Resident',
-        flat: formData.get('flat')?.toString().trim() || '-',
-        priority: formData.get('priority')?.toString().trim() || 'Medium',
-        status: 'Pending',
-        date: new Date().toISOString()
-      };
+      try {
+        const formData = new FormData(form);
+        const complaint = {
+          title: formData.get('subject')?.toString().trim() || 'Complaint',
+          description: formData.get('description')?.toString().trim() || '',
+          resident: formData.get('resident')?.toString().trim() || auth?.currentUser?.email || 'Resident',
+          flat: formData.get('flat')?.toString().trim() || '-',
+          priority: formData.get('priority')?.toString().trim() || 'Medium',
+          status: 'Pending',
+          date: new Date().toISOString()
+        };
 
-      await addCollectionItem('complaints', complaint);
-      window.SMSData.complaints.unshift(complaint);
-      window.SMSData.stats.complaints = window.SMSData.complaints.length;
-      renderAppData();
+        await addCollectionItem('complaints', complaint);
 
-      alert('Complaint submitted successfully!');
-      form.reset();
+        showToast('Complaint submitted successfully!', 'success');
+        form.reset();
+      } catch (error) {
+        showToast(error.message || 'Failed to submit complaint.', 'danger');
+      }
     });
   });
 }
@@ -413,31 +657,91 @@ function initNoticeForm() {
   noticeForm.addEventListener('submit', async (event) => {
     event.preventDefault();
 
-    const formData = new FormData(noticeForm);
-    const notice = {
-      title: formData.get('title')?.toString().trim() || 'Notice',
-      content: formData.get('content')?.toString().trim() || '',
-      target: formData.get('target')?.toString().trim() || 'All Residents',
-      author: auth?.currentUser?.email || 'Admin',
-      date: new Date().toISOString()
-    };
+    try {
+      const formData = new FormData(noticeForm);
+      const notice = {
+        title: formData.get('title')?.toString().trim() || 'Notice',
+        content: formData.get('content')?.toString().trim() || '',
+        target: formData.get('target')?.toString().trim() || 'All Residents',
+        author: auth?.currentUser?.email || 'Admin',
+        date: new Date().toISOString()
+      };
 
-    await addCollectionItem('notices', notice);
-    window.SMSData.notices.unshift(notice);
-    renderAppData();
+      await addCollectionItem('notices', notice);
 
-    alert('Notice published successfully!');
-    noticeForm.reset();
+      showToast('Notice published successfully!', 'success');
+      noticeForm.reset();
+    } catch (error) {
+      showToast(error.message || 'Failed to publish notice.', 'danger');
+    }
   });
 }
 
 async function addCollectionItem(collectionName, item) {
-  if (!database) {
-    console.warn(`[database] ${collectionName} write skipped because databaseURL is missing`);
-    return;
-  }
+  ensureDatabaseAvailable(`write ${collectionName}`);
 
-  await database.ref(collectionName).push(item);
+  try {
+    return await database.ref(collectionName).push(item);
+  } catch (error) {
+    console.error(`[database] failed to write ${collectionName}`, error);
+    throw new Error(`Unable to save ${collectionName} to Firebase.`);
+  }
+}
+
+function ensureDatabaseAvailable(action) {
+  if (database) return;
+  throw new Error(`Cannot ${action} because Firebase Realtime Database is not configured.`);
+}
+
+async function createResidentProfile(uid, resident) {
+  ensureDatabaseAvailable('save resident profile');
+
+  const profile = {
+    ...resident,
+    createdAt: new Date().toISOString()
+  };
+
+  await database.ref(`residents/${uid}`).set(profile);
+  await database.ref('stats/totalResidents').transaction((current) => (current || 0) + 1);
+}
+
+function showToast(message, variant = 'info') {
+  const container = getToastContainer();
+  const toastEl = document.createElement('div');
+  const variantClass = variant === 'danger'
+    ? 'text-bg-danger'
+    : variant === 'success'
+      ? 'text-bg-success'
+      : 'text-bg-dark';
+
+  toastEl.className = `toast align-items-center border-0 ${variantClass}`;
+  toastEl.setAttribute('role', 'status');
+  toastEl.setAttribute('aria-live', 'polite');
+  toastEl.setAttribute('aria-atomic', 'true');
+  toastEl.innerHTML = `
+    <div class="d-flex">
+      <div class="toast-body">${escapeHtml(message)}</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  `;
+
+  container.appendChild(toastEl);
+  const toast = new bootstrap.Toast(toastEl, { delay: 3200 });
+  toastEl.addEventListener('hidden.bs.toast', () => {
+    toastEl.remove();
+  });
+  toast.show();
+}
+
+function getToastContainer() {
+  let container = document.getElementById('app-toast-container');
+  if (container) return container;
+
+  container = document.createElement('div');
+  container.id = 'app-toast-container';
+  container.className = 'toast-container position-fixed top-0 end-0 p-3';
+  document.body.appendChild(container);
+  return container;
 }
 
 async function initAuth() {
@@ -445,6 +749,14 @@ async function initAuth() {
 
   auth.onAuthStateChanged(async (user) => {
     console.log('[auth] stateChanged', user ? { email: user.email, displayName: user.displayName } : null);
+
+    if (user) {
+      sessionStorage.setItem('user_role', getUserRole(user));
+      sessionStorage.setItem('user_email', user.email);
+    } else {
+      sessionStorage.removeItem('user_role');
+      sessionStorage.removeItem('user_email');
+    }
 
     updateAuthProfile(user);
     updateHomeAuthState(user);
@@ -455,6 +767,18 @@ async function initAuth() {
       authFormInitialized = true;
     }
   });
+}
+
+function applyInitialAuthState() {
+  const storedRole = sessionStorage.getItem('user_role');
+  const storedEmail = sessionStorage.getItem('user_email');
+  
+  if (storedRole) {
+    // Mock a user object for immediate UI update
+    const mockUser = { email: storedEmail, displayName: storedRole };
+    updateAuthProfile(mockUser);
+    updateHomeAuthState(mockUser);
+  }
 }
 
 function initAuthForm(user) {
@@ -534,11 +858,18 @@ function initAuthForm(user) {
       if (mode === 'signup') {
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         await userCredential.user.updateProfile({ displayName: selectedRole });
-        setAuthStatus(
-          authStatus,
-          'success',
-          'Account created. You can now sign in with your new account.'
-        );
+        try {
+          await createResidentProfile(userCredential.user.uid, {
+            name: email.split('@')[0],
+            email,
+            flat: '-',
+            role: selectedRole
+          });
+        } catch (profileError) {
+          console.error('[auth] resident profile sync failed', profileError);
+          throw new Error(`Account created, but resident profile sync failed: ${profileError.message}`);
+        }
+        setAuthStatus(authStatus, 'success', 'Account created and saved successfully.');
         authForm.reset();
         updateAuthMode();
         return;
@@ -611,10 +942,29 @@ function updateAuthProfile(user) {
     emailElement.textContent = user?.email || 'Guest';
   }
 
+  const role = user ? getUserRole(user) : 'visitor';
   if (roleElement) {
-    const role = user ? getUserRole(user) : 'visitor';
     roleElement.textContent = capitalize(role);
   }
+
+  // Role-based sidebar link visibility
+  const adminLinks = document.querySelectorAll('.nav-link[href*="admin-dashboard"]');
+  const residentLinks = document.querySelectorAll('.nav-link[href*="resident-dashboard"]');
+  
+  adminLinks.forEach(link => {
+    const parentLi = link.closest('li');
+    if (parentLi) {
+      parentLi.style.display = role === 'admin' ? 'block' : 'none';
+    }
+  });
+
+  residentLinks.forEach(link => {
+    const parentLi = link.closest('li');
+    if (parentLi) {
+      // Hide Resident Dashboard for Admins, show for Residents
+      parentLi.style.display = role === 'resident' ? 'block' : 'none';
+    }
+  });
 }
 
 function updateHomeAuthState(user) {
@@ -740,6 +1090,9 @@ async function logout() {
   if (auth) {
     await auth.signOut();
   }
+  
+  sessionStorage.removeItem('user_role');
+  sessionStorage.removeItem('user_email');
 
   redirectToLogin();
 }
