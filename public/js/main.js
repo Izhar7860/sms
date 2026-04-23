@@ -947,12 +947,22 @@ function updateAuthProfile(user) {
     roleElement.textContent = capitalize(role);
   }
 
-  // Toggle visibility of admin-only menu items
+  // Role-based sidebar link visibility
   const adminLinks = document.querySelectorAll('.nav-link[href*="admin-dashboard"]');
+  const residentLinks = document.querySelectorAll('.nav-link[href*="resident-dashboard"]');
+  
   adminLinks.forEach(link => {
     const parentLi = link.closest('li');
     if (parentLi) {
       parentLi.style.display = role === 'admin' ? 'block' : 'none';
+    }
+  });
+
+  residentLinks.forEach(link => {
+    const parentLi = link.closest('li');
+    if (parentLi) {
+      // Hide Resident Dashboard for Admins, show for Residents
+      parentLi.style.display = role === 'resident' ? 'block' : 'none';
     }
   });
 }
