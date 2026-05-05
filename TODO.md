@@ -1,26 +1,20 @@
-# Society Management System - Implementation TODO
+# Parking Allocation Implementation TODO
 
-## Plan Steps (Approved by User)
+## Approved Plan Summary
+Add parking allocation feature: data model, UI forms, Firebase CRUD for assigning slots to owners.
 
-1. [x] Create directory structure: css/, js/, img/, pages/
-2. [x] Create shared files:
-   - [x] css/style.css (custom styles)
-   - [x] js/main.js (common JS)
-3. [x] Create main pages:
-   - [x] index.html (Home page)
-   - [x] pages/admin-dashboard.html
-   - [x] pages/resident-dashboard.html
-   - [x] pages/parking.html
-   - [x] pages/complaints.html
-   - [x] pages/payments.html
-   - [x] pages/notices.html
-   - [x] pages/login.html
-4. [x] Add dummy data and test interactivity (already included in JS and pages)
-5. [x] Final testing and live server preview
+**Status**: 5/8 complete
 
-**All core files created successfully! Project complete.**
+## Step-by-Step Tasks
 
-- View home page: Open `index.html`
-- Full demo: Run `npx live-server` (if installed) or use VSCode Live Server extension
+### 1. Update data.json with parkingAllocations (sample data) ✅
+### 2. Update defaultSMSData in main.js to include parkingAllocations [Pending]
+### 3. Add Firebase realtime listener for parkingAllocations in main.js ✅
+### 4. Implement renderParkingAllocationsTable() in main.js [Pending]
+### 5. Add allocation modal and form handlers in main.js [Pending]
+### 6. Update pages/parking.html: dynamic table, modals, buttons ✅
+### 7. Enhance parking grid to show owner details in main.js [Pending]
+### 8. Add CRUD functions (allocate/edit/delete) with Firebase in main.js [Pending]
 
-Progress: 100% Complete ✅
+## Next Action
+Implement Step 5: Add allocation modal and form handlers in main.js

@@ -44,7 +44,8 @@ const defaultSMSData = {
     { id: 4, slot: 'P-04', status: 'occupied' },
     { id: 5, slot: 'P-05', status: 'reserved' },
     { id: 6, slot: 'P-06', status: 'available' }
-  ]
+  ],
+  parkingAllocations: []
 };
 
 window.SMSData = structuredClone
@@ -209,6 +210,11 @@ async function hydrateAppData() {
 
     attachRealtimeCollection('parkingSlots', defaultSMSData.parkingSlots, (value) => {
       window.SMSData.parkingSlots = normalizeCollection(value, defaultSMSData.parkingSlots);
+      renderAppData();
+    });
+
+    attachRealtimeCollection('parkingAllocations', defaultSMSData.parkingAllocations, (value) => {
+      window.SMSData.parkingAllocations = normalizeCollection(value, defaultSMSData.parkingAllocations);
       renderAppData();
     });
   } catch (error) {
@@ -1071,9 +1077,9 @@ function formatShortDate(value) {
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
+    .replaceAll('<', '<')
+    .replaceAll('>', '>')
+    .replaceAll('"', '"')
     .replaceAll("'", '&#39;');
 }
 
@@ -1098,3 +1104,81 @@ async function logout() {
 }
 
 window.logout = logout;
+
+window.showAllocationModal = function() {
+  const modal = new bootstrap.Modal(document.getElementById('allocationModal'));
+  // Set default dates
+  document.querySelector('#allocationForm [name="allocatedDate"]').value = new Date().toISOString().split('T')[0];
+  modal.show();
+};
+
+window.saveAllocation = async function() {
+  const form = document.getElementById('allocationForm');
+  const formData = new FormData(form);
+  const allocation = {
+    slot: formData.get('slot'),
+    ownerName: formData.get('ownerName'),
+    flat: formData.get('flat'),
+    vehicleNumber: formData.get('vehicleNumber'),
+    status: formData.get('status') || 'pending',
+    allocatedDate: formData.get('allocatedDate'),
+    expiryDate: formData.get('expiryDate')
+  };
+
+  if (!allocation.slot) {
+    showToast('Please select a slot', 'warning');
+    return;
+  }
+
+  try {
+    const ref = await addCollectionItem('parkingAllocations', allocation);
+    showToast('Parking allocation saved!', 'success');
+    bootstrap.Modal.getInstance(form.closest('.modal')).hide();
+    form.reset();
+  } catch (error) {
+    showToast('Failed to save: ' + error.message, 'danger');
+  }
+};
+
+function renderParkingAllocationsTable() {
+  const tbody = document.querySelector('.table tbody');
+  if (!tbody || !window.SMSData.parkingAllocations) return;
+
+  tbody.innerHTML = '';
+  if (!window.SMSData.parkingAllocations.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" class="text-center text-muted py-4">
+          <i class="fas fa-inbox fs-1 text-muted mb-3"></i>
+          No parking allocations
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  window.SMSData.parkingAllocations.forEach((alloc) => {
+    const row = document.createElement('tr');
+    const statusBadge = alloc.status === 'active' 
+      ? 'badge bg-success' 
+      : alloc.status === 'pending' 
+        ? 'badge bg-warning text-dark' 
+        : 'badge bg-secondary';
+    row.innerHTML = `
+      <td><strong>${alloc.slot}</strong></td>
+      <td>${escapeHtml(alloc.ownerName)}</td>
+      <td>${alloc.flat}</td>
+      <td>${alloc.vehicleNumber}</td>
+      <td><span class="${statusBadge}">${capitalize(alloc.status)}</span></td>
+      <td>
+        <button class="btn btn-sm btn-outline-primary" onclick="editAllocation('${alloc.id}')">
+          <i class="fas fa-edit"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-danger ms-1" onclick="deleteAllocation('${alloc.id}')">
+          <i class="fas fa-trash"></i>
+        </button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
