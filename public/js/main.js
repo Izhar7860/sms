@@ -98,6 +98,8 @@ const database = hasDatabaseConfig
 
 let authFormInitialized = false;
 const databaseListeners = [];
+let parkingSlotsSeeded = false;
+const localComplaintsStorageKey = 'sms_local_complaints';
 
 document.addEventListener('DOMContentLoaded', async () => {
   initSidebar();
@@ -107,12 +109,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Apply immediate UI state from sessionStorage to prevent flicker
   applyInitialAuthState();
 
-  await hydrateAppData();
-
+  let initialUser = null;
   if (auth) {
-    await initAuth();
+    initialUser = await initAuth();
   } else {
     showConfigWarning();
+  }
+
+  const authRequired = document.body?.dataset.authRequired === 'true';
+  if (!authRequired || initialUser || !auth) {
+    await hydrateAppData();
   }
 });
 
@@ -208,8 +214,13 @@ async function hydrateAppData() {
       renderAppData();
     });
 
-    attachRealtimeCollection('parkingSlots', defaultSMSData.parkingSlots, (value) => {
-      window.SMSData.parkingSlots = normalizeCollection(value, defaultSMSData.parkingSlots);
+    attachRealtimeCollection('parkingSlots', defaultSMSData.parkingSlots, (value, rawValue, error) => {
+      window.SMSData.parkingSlots = rawValue
+        ? normalizeCollection(value, defaultSMSData.parkingSlots)
+        : [...defaultSMSData.parkingSlots];
+      if (!rawValue && !error) {
+        seedDefaultParkingSlots();
+      }
       renderAppData();
     });
 
@@ -234,7 +245,7 @@ function attachRealtimeCollection(path, fallbackValue, onValue) {
     },
     (error) => {
       console.warn(`[database] failed to subscribe to ${path}`, error);
-      onValue(getRealtimeEmptyValue(fallbackValue), null);
+      onValue(getRealtimeEmptyValue(fallbackValue), null, error);
     }
   );
 
@@ -254,8 +265,11 @@ function getRealtimeEmptyValue(fallbackValue) {
 }
 
 function renderAppData() {
+  mergeLocalComplaints();
   updateStats();
   renderParkingGrid();
+  renderParkingSlotOptions();
+  renderParkingAllocationsTable();
   renderNotices();
   renderComplaints();
 }
@@ -347,14 +361,51 @@ function renderParkingGrid() {
 
   container.innerHTML = '';
   window.SMSData.parkingSlots.forEach((slot, index) => {
+    const allocation = findAllocationForSlot(slot);
     const slotEl = document.createElement('div');
     const slotName = slot.slot || `P-${String(index + 1).padStart(2, '0')}`;
     const status = slot.status || 'available';
     slotEl.className = `parking-slot ${status}`;
     slotEl.textContent = slotName;
-    slotEl.title = capitalize(status);
+    slotEl.title = allocation
+      ? `${capitalize(status)} - ${allocation.ownerName || 'Allocated'} (${allocation.flat || 'Flat not set'})`
+      : capitalize(status);
     container.appendChild(slotEl);
   });
+}
+
+function renderParkingSlotOptions() {
+  const select = document.querySelector('#allocationForm [name="slot"]');
+  if (!select) return;
+
+  const selectedSlot = select.value;
+  select.innerHTML = '<option value="">Choose slot...</option>';
+
+  window.SMSData.parkingSlots.forEach((slot, index) => {
+    const slotName = slot.slot || `P-${String(index + 1).padStart(2, '0')}`;
+    const status = (slot.status || 'available').toLowerCase();
+    const option = document.createElement('option');
+    option.value = slotName;
+    option.textContent = status === 'available'
+      ? slotName
+      : `${slotName} (${capitalize(status)})`;
+    option.disabled = status !== 'available' && slotName !== selectedSlot;
+    select.appendChild(option);
+  });
+
+  if ([...select.options].some((option) => option.value === selectedSlot)) {
+    select.value = selectedSlot;
+  }
+}
+
+function findAllocationForSlot(slot) {
+  const allocationId = slot.allocationId;
+  if (allocationId) {
+    const byId = window.SMSData.parkingAllocations.find((allocation) => allocation.id === allocationId);
+    if (byId) return byId;
+  }
+
+  return window.SMSData.parkingAllocations.find((allocation) => allocation.slot === slot.slot);
 }
 
 function renderNotices() {
@@ -645,9 +696,14 @@ function initComplaintForms() {
           date: new Date().toISOString()
         };
 
-        await addCollectionItem('complaints', complaint);
+        const ref = await saveComplaint(complaint);
 
-        showToast('Complaint submitted successfully!', 'success');
+        showToast(
+          ref?.localOnly
+            ? 'Complaint submitted locally. Firebase rules are blocking database writes.'
+            : 'Complaint submitted successfully!',
+          ref?.localOnly ? 'warning' : 'success'
+        );
         form.reset();
       } catch (error) {
         showToast(error.message || 'Failed to submit complaint.', 'danger');
@@ -694,6 +750,196 @@ async function addCollectionItem(collectionName, item) {
   }
 }
 
+async function saveComplaint(complaint) {
+  if (!database) {
+    return saveLocalComplaint(complaint);
+  }
+
+  try {
+    return await database.ref('complaints').push(complaint);
+  } catch (error) {
+    console.error('[database] failed to write complaints', error);
+    if (isPermissionDeniedError(error)) {
+      return saveLocalComplaint(complaint);
+    }
+    throw new Error('Unable to save complaint to Firebase.');
+  }
+}
+
+function saveLocalComplaint(complaint) {
+  const localComplaint = {
+    id: `local-complaint-${Date.now()}`,
+    ...complaint
+  };
+
+  window.SMSData.complaints = [
+    localComplaint,
+    ...window.SMSData.complaints
+  ];
+  persistLocalComplaints();
+  renderAppData();
+
+  return { key: localComplaint.id, localOnly: true };
+}
+
+function mergeLocalComplaints() {
+  const localComplaints = readLocalComplaints();
+  if (!localComplaints.length) return;
+
+  const knownIds = new Set(window.SMSData.complaints.map((complaint) => complaint.id));
+  const missingLocalComplaints = localComplaints.filter((complaint) => !knownIds.has(complaint.id));
+  if (!missingLocalComplaints.length) return;
+
+  window.SMSData.complaints = [
+    ...missingLocalComplaints,
+    ...window.SMSData.complaints
+  ];
+}
+
+function persistLocalComplaints() {
+  try {
+    const localComplaints = window.SMSData.complaints.filter((complaint) => {
+      return typeof complaint.id === 'string' && complaint.id.startsWith('local-complaint-');
+    });
+    localStorage.setItem(localComplaintsStorageKey, JSON.stringify(localComplaints));
+  } catch (error) {
+    console.warn('[storage] failed to persist local complaints', error);
+  }
+}
+
+function readLocalComplaints() {
+  try {
+    const storedValue = localStorage.getItem(localComplaintsStorageKey);
+    const complaints = storedValue ? JSON.parse(storedValue) : [];
+    return Array.isArray(complaints) ? complaints : [];
+  } catch (error) {
+    console.warn('[storage] failed to read local complaints', error);
+    return [];
+  }
+}
+
+async function seedDefaultParkingSlots() {
+  if (parkingSlotsSeeded || !database) return;
+  parkingSlotsSeeded = true;
+
+  const updates = {};
+  defaultSMSData.parkingSlots.forEach((slot) => {
+    const key = `slot${slot.id || slot.slot?.replace(/\D/g, '')}`;
+    updates[`parkingSlots/${key}`] = {
+      slot: slot.slot,
+      status: slot.status || 'available'
+    };
+  });
+
+  try {
+    await database.ref().update(updates);
+  } catch (error) {
+    parkingSlotsSeeded = false;
+    if (isPermissionDeniedError(error)) {
+      console.warn('[database] parking slot seed skipped because Firebase rules denied access.');
+      return;
+    }
+    console.error('[database] failed to seed parking slots', error);
+  }
+}
+
+async function saveParkingAllocation(allocation) {
+  ensureDatabaseAvailable('save parking allocation');
+
+  try {
+    const allocationRef = database.ref('parkingAllocations').push();
+    const parkingSlot = await findParkingSlotRecord(allocation.slot);
+    const slotRef = parkingSlot?.key
+      ? database.ref(`parkingSlots/${parkingSlot.key}`)
+      : database.ref('parkingSlots').push();
+
+    const slotRecord = {
+      ...(parkingSlot?.value || {}),
+      slot: allocation.slot,
+      status: getSlotStatusForAllocation(allocation.status),
+      allocationId: allocationRef.key
+    };
+
+    await database.ref().update({
+      [`parkingAllocations/${allocationRef.key}`]: allocation,
+      [`parkingSlots/${slotRef.key}`]: slotRecord
+    });
+
+    return allocationRef;
+  } catch (error) {
+    console.error('[database] failed to save parking allocation', error);
+    if (isPermissionDeniedError(error)) {
+      return saveLocalParkingAllocation(allocation);
+    }
+    throw new Error('Unable to save parking allocation to Firebase.');
+  }
+}
+
+async function findParkingSlotRecord(slotName) {
+  const snapshot = await database
+    .ref('parkingSlots')
+    .orderByChild('slot')
+    .equalTo(slotName)
+    .limitToFirst(1)
+    .once('value');
+  const value = snapshot.val();
+  if (!value) return null;
+
+  const [key, slot] = Object.entries(value)[0];
+  return { key, value: slot };
+}
+
+function getSlotStatusForAllocation(status) {
+  return (status || '').toLowerCase() === 'active' ? 'occupied' : 'reserved';
+}
+
+function saveLocalParkingAllocation(allocation) {
+  const id = `local-${Date.now()}`;
+  const localAllocation = { id, ...allocation };
+  const slotStatus = getSlotStatusForAllocation(allocation.status);
+  const existingSlot = window.SMSData.parkingSlots.find((slot) => slot.slot === allocation.slot);
+
+  window.SMSData.parkingAllocations = [
+    localAllocation,
+    ...window.SMSData.parkingAllocations
+  ];
+
+  if (existingSlot) {
+    existingSlot.status = slotStatus;
+    existingSlot.allocationId = id;
+  } else {
+    window.SMSData.parkingSlots.push({
+      id,
+      slot: allocation.slot,
+      status: slotStatus,
+      allocationId: id
+    });
+  }
+
+  renderAppData();
+  return { key: id, localOnly: true };
+}
+
+function deleteLocalParkingAllocation(allocationId) {
+  const allocation = window.SMSData.parkingAllocations.find((item) => item.id === allocationId);
+  window.SMSData.parkingAllocations = window.SMSData.parkingAllocations.filter((item) => item.id !== allocationId);
+
+  if (allocation?.slot) {
+    const parkingSlot = window.SMSData.parkingSlots.find((slot) => slot.slot === allocation.slot);
+    if (parkingSlot) {
+      parkingSlot.status = 'available';
+      delete parkingSlot.allocationId;
+    }
+  }
+
+  renderAppData();
+}
+
+function isPermissionDeniedError(error) {
+  const message = `${error?.code || ''} ${error?.message || ''}`.toLowerCase();
+  return message.includes('permission_denied') || message.includes('permission denied');
+}
+
 function ensureDatabaseAvailable(action) {
   if (database) return;
   throw new Error(`Cannot ${action} because Firebase Realtime Database is not configured.`);
@@ -718,7 +964,9 @@ function showToast(message, variant = 'info') {
     ? 'text-bg-danger'
     : variant === 'success'
       ? 'text-bg-success'
-      : 'text-bg-dark';
+      : variant === 'warning'
+        ? 'text-bg-warning'
+        : 'text-bg-dark';
 
   toastEl.className = `toast align-items-center border-0 ${variantClass}`;
   toastEl.setAttribute('role', 'status');
@@ -753,25 +1001,34 @@ function getToastContainer() {
 async function initAuth() {
   console.log('[auth] initAuth');
 
-  auth.onAuthStateChanged(async (user) => {
-    console.log('[auth] stateChanged', user ? { email: user.email, displayName: user.displayName } : null);
+  return new Promise((resolve) => {
+    let initialStateResolved = false;
 
-    if (user) {
-      sessionStorage.setItem('user_role', getUserRole(user));
-      sessionStorage.setItem('user_email', user.email);
-    } else {
-      sessionStorage.removeItem('user_role');
-      sessionStorage.removeItem('user_email');
-    }
+    auth.onAuthStateChanged(async (user) => {
+      console.log('[auth] stateChanged', user ? { email: user.email, displayName: user.displayName } : null);
 
-    updateAuthProfile(user);
-    updateHomeAuthState(user);
-    await applyAuthGuard(user);
+      if (user) {
+        sessionStorage.setItem('user_role', getUserRole(user));
+        sessionStorage.setItem('user_email', user.email);
+      } else {
+        sessionStorage.removeItem('user_role');
+        sessionStorage.removeItem('user_email');
+      }
 
-    if (!authFormInitialized && document.body?.dataset.authPage === 'login') {
-      initAuthForm(user);
-      authFormInitialized = true;
-    }
+      updateAuthProfile(user);
+      updateHomeAuthState(user);
+      await applyAuthGuard(user);
+
+      if (!authFormInitialized && document.body?.dataset.authPage === 'login') {
+        initAuthForm(user);
+        authFormInitialized = true;
+      }
+
+      if (!initialStateResolved) {
+        initialStateResolved = true;
+        resolve(user);
+      }
+    });
   });
 }
 
@@ -1077,9 +1334,9 @@ function formatShortDate(value) {
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
-    .replaceAll('<', '<')
-    .replaceAll('>', '>')
-    .replaceAll('"', '"')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
 }
 
@@ -1107,6 +1364,7 @@ window.logout = logout;
 
 window.showAllocationModal = function() {
   const modal = new bootstrap.Modal(document.getElementById('allocationModal'));
+  renderParkingSlotOptions();
   // Set default dates
   document.querySelector('#allocationForm [name="allocatedDate"]').value = new Date().toISOString().split('T')[0];
   modal.show();
@@ -1116,10 +1374,10 @@ window.saveAllocation = async function() {
   const form = document.getElementById('allocationForm');
   const formData = new FormData(form);
   const allocation = {
-    slot: formData.get('slot'),
-    ownerName: formData.get('ownerName'),
-    flat: formData.get('flat'),
-    vehicleNumber: formData.get('vehicleNumber'),
+    slot: formData.get('slot')?.toString().trim(),
+    ownerName: formData.get('ownerName')?.toString().trim(),
+    flat: formData.get('flat')?.toString().trim(),
+    vehicleNumber: formData.get('vehicleNumber')?.toString().trim(),
     status: formData.get('status') || 'pending',
     allocatedDate: formData.get('allocatedDate'),
     expiryDate: formData.get('expiryDate')
@@ -1131,8 +1389,13 @@ window.saveAllocation = async function() {
   }
 
   try {
-    const ref = await addCollectionItem('parkingAllocations', allocation);
-    showToast('Parking allocation saved!', 'success');
+    const ref = await saveParkingAllocation(allocation);
+    showToast(
+      ref?.localOnly
+        ? 'Saved locally. Firebase rules are still blocking database writes.'
+        : 'Parking allocation saved!',
+      ref?.localOnly ? 'warning' : 'success'
+    );
     bootstrap.Modal.getInstance(form.closest('.modal')).hide();
     form.reset();
   } catch (error) {
@@ -1140,8 +1403,48 @@ window.saveAllocation = async function() {
   }
 };
 
+window.deleteAllocation = async function(allocationId) {
+  if (!allocationId || !confirm('Delete this parking allocation?')) return;
+
+  try {
+    if (allocationId.startsWith('local-')) {
+      deleteLocalParkingAllocation(allocationId);
+      showToast('Local parking allocation deleted.', 'success');
+      return;
+    }
+
+    ensureDatabaseAvailable('delete parking allocation');
+    const allocation = window.SMSData.parkingAllocations.find((item) => item.id === allocationId);
+    const updates = {
+      [`parkingAllocations/${allocationId}`]: null
+    };
+
+    if (allocation?.slot) {
+      const parkingSlot = await findParkingSlotRecord(allocation.slot);
+      if (parkingSlot?.key) {
+        updates[`parkingSlots/${parkingSlot.key}/status`] = 'available';
+        updates[`parkingSlots/${parkingSlot.key}/allocationId`] = null;
+      }
+    }
+
+    await database.ref().update(updates);
+    showToast('Parking allocation deleted.', 'success');
+  } catch (error) {
+    if (isPermissionDeniedError(error)) {
+      deleteLocalParkingAllocation(allocationId);
+      showToast('Deleted locally. Firebase rules are still blocking database writes.', 'warning');
+      return;
+    }
+    showToast(error.message || 'Failed to delete allocation.', 'danger');
+  }
+};
+
+window.editAllocation = function() {
+  showToast('Delete and recreate the allocation to change it.', 'info');
+};
+
 function renderParkingAllocationsTable() {
-  const tbody = document.querySelector('.table tbody');
+  const tbody = document.querySelector('#parking-allocations-table tbody, .table tbody');
   if (!tbody || !window.SMSData.parkingAllocations) return;
 
   tbody.innerHTML = '';
@@ -1165,11 +1468,11 @@ function renderParkingAllocationsTable() {
         ? 'badge bg-warning text-dark' 
         : 'badge bg-secondary';
     row.innerHTML = `
-      <td><strong>${alloc.slot}</strong></td>
+      <td><strong>${escapeHtml(alloc.slot)}</strong></td>
       <td>${escapeHtml(alloc.ownerName)}</td>
-      <td>${alloc.flat}</td>
-      <td>${alloc.vehicleNumber}</td>
-      <td><span class="${statusBadge}">${capitalize(alloc.status)}</span></td>
+      <td>${escapeHtml(alloc.flat)}</td>
+      <td>${escapeHtml(alloc.vehicleNumber)}</td>
+      <td><span class="${statusBadge}">${escapeHtml(capitalize(alloc.status))}</span></td>
       <td>
         <button class="btn btn-sm btn-outline-primary" onclick="editAllocation('${alloc.id}')">
           <i class="fas fa-edit"></i>

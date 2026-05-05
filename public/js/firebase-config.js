@@ -1,11 +1,11 @@
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 window.SMS_FIREBASE_CONFIG = {
-  apiKey: 'AIzaSyDQoLPv834S2TbBw6pM5aECLRribzgnNdU',
-  authDomain: 'projects-6c49a.firebaseapp.com',
-  projectId: 'projects-6c49a',
-  storageBucket: 'projects-6c49a.firebasestorage.app',
-  messagingSenderId: '770504051582',
-  appId: '1:770504051582:web:801a14c4de3d1b87ea012f',
-  databaseURL: 'https://projects-6c49a-default-rtdb.asia-southeast1.firebasedatabase.app/',
-  measurementId: 'G-CZ2BSPQ7NC'
+  apiKey: "AIzaSyDyBXAzFuLOYwybjdt5SiebnpsXy7r9Ol4",
+  authDomain: "society-management-516a3.firebaseapp.com",
+  databaseURL: "https://society-management-516a3-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "society-management-516a3",
+  storageBucket: "society-management-516a3.firebasestorage.app",
+  messagingSenderId: "596561836172",
+  appId: "1:596561836172:web:2cac0df8a1883b3c75a3a9",
+  measurementId: "G-7PS21028VW"
 };

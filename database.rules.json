@@ -1,0 +1,40 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid || root.child('users/' + auth.uid + '/role').val() === 'admin'",
+        ".write": "$uid === auth.uid || root.child('users/' + auth.uid + '/role').val() === 'admin'"
+      }
+    },
+    "stats": {
+      ".read": "auth != null",
+      ".write": "root.child('users/' + auth.uid + '/role').val() === 'admin'"
+    },
+    "residents": {
+      ".read": "auth != null",
+      ".write": "root.child('users/' + auth.uid + '/role').val() === 'admin'"
+    },
+    "payments": {
+      ".read": "auth != null",
+      ".write": "root.child('users/' + auth.uid + '/role').val() === 'admin'"
+    },
+    "notices": {
+      ".read": "auth != null",
+      ".write": "root.child('users/' + auth.uid + '/role').val() === 'admin'"
+    },
+    "complaints": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "parkingSlots": {
+      ".read": "auth != null",
+      ".write": "root.child('users/' + auth.uid + '/role').val() === 'admin'"
+    },
+    "parkingAllocations": {
+      ".read": "auth != null",
+      ".write": "root.child('users/' + auth.uid + '/role').val() === 'admin'"
+    }
+  }
+}
