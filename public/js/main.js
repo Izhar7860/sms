@@ -182,12 +182,14 @@ async function hydrateAppData() {
   if (!database) return;
 
   try {
-    attachRealtimeCollection('stats', defaultSMSData.stats, (value) => {
+    const collections = getPageDataCollections();
+
+    if (collections.has('stats')) attachRealtimeCollection('stats', defaultSMSData.stats, (value) => {
       window.SMSData.stats = { ...defaultSMSData.stats, ...(value || {}) };
       renderAppData();
     });
 
-    attachRealtimeCollection('residents', defaultSMSData.residents, (value, rawValue) => {
+    if (collections.has('residents')) attachRealtimeCollection('residents', defaultSMSData.residents, (value, rawValue) => {
       window.SMSData.residents = normalizeCollection(value, defaultSMSData.residents);
       if (rawValue) {
         window.SMSData.stats.totalResidents = window.SMSData.residents.length;
@@ -195,7 +197,7 @@ async function hydrateAppData() {
       renderAppData();
     });
 
-    attachRealtimeCollection('payments', defaultSMSData.payments, (value, rawValue) => {
+    if (collections.has('payments')) attachRealtimeCollection('payments', defaultSMSData.payments, (value, rawValue) => {
       window.SMSData.payments = normalizeCollection(value, defaultSMSData.payments);
       if (rawValue) {
         window.SMSData.stats.pendingPayments = countPendingPayments(window.SMSData.payments);
@@ -203,18 +205,18 @@ async function hydrateAppData() {
       renderAppData();
     });
 
-    attachRealtimeCollection('complaints', defaultSMSData.complaints, (value) => {
+    if (collections.has('complaints')) attachRealtimeCollection('complaints', defaultSMSData.complaints, (value) => {
       window.SMSData.complaints = normalizeCollection(value, defaultSMSData.complaints);
       window.SMSData.stats.complaints = window.SMSData.complaints.length;
       renderAppData();
     });
 
-    attachRealtimeCollection('notices', defaultSMSData.notices, (value) => {
+    if (collections.has('notices')) attachRealtimeCollection('notices', defaultSMSData.notices, (value) => {
       window.SMSData.notices = normalizeCollection(value, defaultSMSData.notices);
       renderAppData();
     });
 
-    attachRealtimeCollection('parkingSlots', defaultSMSData.parkingSlots, (value, rawValue, error) => {
+    if (collections.has('parkingSlots')) attachRealtimeCollection('parkingSlots', defaultSMSData.parkingSlots, (value, rawValue, error) => {
       window.SMSData.parkingSlots = rawValue
         ? normalizeCollection(value, defaultSMSData.parkingSlots)
         : [...defaultSMSData.parkingSlots];
@@ -224,7 +226,7 @@ async function hydrateAppData() {
       renderAppData();
     });
 
-    attachRealtimeCollection('parkingAllocations', defaultSMSData.parkingAllocations, (value) => {
+    if (collections.has('parkingAllocations')) attachRealtimeCollection('parkingAllocations', defaultSMSData.parkingAllocations, (value) => {
       window.SMSData.parkingAllocations = normalizeCollection(value, defaultSMSData.parkingAllocations);
       renderAppData();
     });
@@ -232,6 +234,38 @@ async function hydrateAppData() {
     console.warn('[database] falling back to local demo data', error);
     renderAppData();
   }
+}
+
+function getPageDataCollections() {
+  const collections = new Set();
+  const has = (selector) => Boolean(document.querySelector(selector));
+
+  if (has('.stat-flats, .stat-residents, .stat-pending, .stat-complaints')) {
+    collections.add('stats');
+  }
+
+  if (has('#add-resident-form, .stat-residents')) {
+    collections.add('residents');
+  }
+
+  if (has('.stat-pending, [data-payments-table]')) {
+    collections.add('payments');
+  }
+
+  if (has('[data-complaint-form], [data-complaints-table], [data-complaint-stat], .stat-complaints')) {
+    collections.add('complaints');
+  }
+
+  if (has('#notices-list, #notice-form, [data-notice-count]')) {
+    collections.add('notices');
+  }
+
+  if (has('.parking-grid, #parking-allocations-table, #allocationForm, [data-parking-stat]')) {
+    collections.add('parkingSlots');
+    collections.add('parkingAllocations');
+  }
+
+  return collections;
 }
 
 function attachRealtimeCollection(path, fallbackValue, onValue) {
@@ -970,7 +1004,28 @@ async function createResidentProfile(uid, resident) {
   };
 
   await database.ref(`residents/${uid}`).set(profile);
+  await database.ref(`users/${uid}`).set({
+    email: resident.email || '',
+    role: resident.role || 'resident'
+  });
   await database.ref('stats/totalResidents').transaction((current) => (current || 0) + 1);
+}
+
+async function syncCurrentUserRole(user) {
+  if (!database || !user?.uid) return;
+
+  try {
+    await database.ref(`users/${user.uid}`).update({
+      email: user.email || '',
+      role: getUserRole(user)
+    });
+  } catch (error) {
+    if (isPermissionDeniedError(error)) {
+      console.info('[database] user role sync skipped because Firebase rules denied access.');
+      return;
+    }
+    console.warn('[database] failed to sync user role', error);
+  }
 }
 
 function showToast(message, variant = 'info') {
@@ -1026,6 +1081,7 @@ async function initAuth() {
       if (user) {
         sessionStorage.setItem('user_role', getUserRole(user));
         sessionStorage.setItem('user_email', user.email);
+        await syncCurrentUserRole(user);
       } else {
         sessionStorage.removeItem('user_role');
         sessionStorage.removeItem('user_email');
