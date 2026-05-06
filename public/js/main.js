@@ -403,7 +403,7 @@ function renderParkingGrid() {
     slotEl.className = `parking-slot ${status}`;
     slotEl.textContent = slotName;
     slotEl.title = allocation
-      ? `${capitalize(status)} - ${allocation.ownerName || 'Allocated'} (${allocation.flat || 'Flat not set'})`
+      ? `${capitalize(status)} - ${allocation.ownerName || 'Allocated'} (${allocation.flat || 'Flat not set'}) - ${allocation.location || 'Location not set'}`
       : capitalize(status);
     container.appendChild(slotEl);
   });
@@ -1493,6 +1493,7 @@ window.saveAllocation = async function() {
   const formData = new FormData(form);
   const allocation = {
     slot: formData.get('slot')?.toString().trim(),
+    location: formData.get('location')?.toString().trim(),
     ownerName: formData.get('ownerName')?.toString().trim(),
     flat: formData.get('flat')?.toString().trim(),
     vehicleNumber: formData.get('vehicleNumber')?.toString().trim(),
@@ -1503,6 +1504,11 @@ window.saveAllocation = async function() {
 
   if (!allocation.slot) {
     showToast('Please select a slot', 'warning');
+    return;
+  }
+
+  if (!allocation.location) {
+    showToast('Please select a parking location', 'warning');
     return;
   }
 
@@ -1593,7 +1599,7 @@ function renderParkingAllocationsTable() {
   if (!window.SMSData.parkingAllocations.length) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" class="text-center text-muted py-4">
+        <td colspan="7" class="text-center text-muted py-4">
           <i class="fas fa-inbox fs-1 text-muted mb-3"></i>
           No parking allocations
         </td>
@@ -1611,6 +1617,7 @@ function renderParkingAllocationsTable() {
         : 'badge bg-secondary';
     row.innerHTML = `
       <td><strong>${escapeHtml(alloc.slot)}</strong></td>
+      <td>${escapeHtml(alloc.location || 'Not set')}</td>
       <td>${escapeHtml(alloc.ownerName)}</td>
       <td>${escapeHtml(alloc.flat)}</td>
       <td>${escapeHtml(alloc.vehicleNumber)}</td>
