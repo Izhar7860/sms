@@ -99,6 +99,7 @@ const database = hasDatabaseConfig
 let authFormInitialized = false;
 const databaseListeners = [];
 let parkingSlotsSeeded = false;
+let parkingAllocationSaving = false;
 const localComplaintsStorageKey = 'sms_local_complaints';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -659,11 +660,24 @@ function initForms() {
 
 function initParkingAllocationForm() {
   const allocationForm = document.getElementById('allocationForm');
+  const addButton = document.getElementById('add-allocation-btn');
+  const saveButton = document.getElementById('save-allocation-btn');
+
+  if (addButton) {
+    addButton.addEventListener('click', window.showAllocationModal);
+  }
+
+  if (saveButton) {
+    saveButton.addEventListener('click', async () => {
+      await window.saveAllocation();
+    });
+  }
+
   if (!allocationForm) return;
 
   allocationForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-    await saveAllocation();
+    await window.saveAllocation();
   });
 }
 
@@ -1435,15 +1449,25 @@ async function logout() {
 window.logout = logout;
 
 window.showAllocationModal = function() {
-  const modal = new bootstrap.Modal(document.getElementById('allocationModal'));
+  const modalEl = document.getElementById('allocationModal');
+  const form = document.getElementById('allocationForm');
+  if (!modalEl || !form) return;
+
+  const modal = new bootstrap.Modal(modalEl);
   renderParkingSlotOptions();
-  // Set default dates
-  document.querySelector('#allocationForm [name="allocatedDate"]').value = new Date().toISOString().split('T')[0];
+  const today = new Date();
+  const nextYear = new Date(today);
+  nextYear.setFullYear(today.getFullYear() + 1);
+
+  form.querySelector('[name="allocatedDate"]').value = today.toISOString().split('T')[0];
+  form.querySelector('[name="expiryDate"]').value = nextYear.toISOString().split('T')[0];
   modal.show();
 };
 
 window.saveAllocation = async function() {
   const form = document.getElementById('allocationForm');
+  const saveButton = document.getElementById('save-allocation-btn');
+  if (!form || parkingAllocationSaving) return;
   if (!form.reportValidity()) return;
 
   const formData = new FormData(form);
@@ -1475,6 +1499,12 @@ window.saveAllocation = async function() {
   }
 
   try {
+    parkingAllocationSaving = true;
+    if (saveButton) {
+      saveButton.disabled = true;
+      saveButton.textContent = 'Saving...';
+    }
+
     const ref = await saveParkingAllocation(allocation);
     showToast(
       ref?.localOnly
@@ -1486,6 +1516,12 @@ window.saveAllocation = async function() {
     form.reset();
   } catch (error) {
     showToast('Failed to save: ' + error.message, 'danger');
+  } finally {
+    parkingAllocationSaving = false;
+    if (saveButton) {
+      saveButton.disabled = false;
+      saveButton.textContent = 'Save Allocation';
+    }
   }
 };
 
