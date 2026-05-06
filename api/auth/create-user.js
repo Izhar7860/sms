@@ -17,7 +17,7 @@ module.exports = async function handler(req, res) {
     const data = await callFirebase('signUp', { email, password, returnSecureToken: true });
 
     if (role || displayName) {
-      await callFirebase('setAccountInfo', {
+      await callFirebase('update', {
         idToken: data.idToken,
         displayName: role || displayName,
         returnSecureToken: false

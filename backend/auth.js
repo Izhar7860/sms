@@ -65,7 +65,7 @@ router.post('/signup', async (req, res, next) => {
     
     // 2. Update the profile with role/displayName
     if (role || displayName) {
-      await callFirebase('setAccountInfo', {
+      await callFirebase('update', {
         idToken: data.idToken,
         displayName: role || displayName,
         returnSecureToken: false
@@ -85,7 +85,7 @@ router.post('/create-user', async (req, res, next) => {
     const data = await callFirebase('signUp', { email, password, returnSecureToken: true });
     
     if (role || displayName) {
-      await callFirebase('setAccountInfo', {
+      await callFirebase('update', {
         idToken: data.idToken,
         displayName: role || displayName,
         returnSecureToken: false
