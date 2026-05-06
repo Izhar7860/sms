@@ -690,6 +690,14 @@ function initAdminForms() {
     const statusEl = document.getElementById('add-resident-status');
     const submitBtn = document.getElementById('add-resident-btn');
     const formData = new FormData(addResidentForm);
+    const resident = {
+      name: formData.get('name')?.toString().trim(),
+      email: formData.get('email')?.toString().trim(),
+      flat: formData.get('flat')?.toString().trim(),
+      role: 'resident'
+    };
+
+    if (!addResidentForm.reportValidity()) return;
 
     setAuthStatus(statusEl, 'info', 'Creating account...');
     submitBtn.disabled = true;
@@ -700,10 +708,10 @@ function initAdminForms() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: formData.get('email'),
+          email: resident.email,
           password: formData.get('password'),
-          role: 'resident', // Default role for new accounts
-          displayName: formData.get('name')
+          role: resident.role,
+          displayName: resident.name
         })
       });
 
@@ -711,14 +719,9 @@ function initAdminForms() {
       if (!response.ok) throw new Error(data.error || 'Failed to create resident account');
 
       // 2. Add resident details to Realtime Database
-      await createResidentProfile(data.localId, {
-        name: formData.get('name'),
-        email: formData.get('email'),
-        flat: formData.get('flat'),
-        role: 'resident'
-      });
+      await createResidentProfile(data.localId, resident);
 
-      setAuthStatus(statusEl, 'success', 'Resident account created successfully!');
+      setAuthStatus(statusEl, 'success', 'Resident account created and saved to database.');
       addResidentForm.reset();
       
       // Close modal after delay
@@ -1012,17 +1015,34 @@ function ensureDatabaseAvailable(action) {
 async function createResidentProfile(uid, resident) {
   ensureDatabaseAvailable('save resident profile');
 
+  if (!uid) {
+    throw new Error('Cannot save resident profile without a Firebase user id.');
+  }
+
   const profile = {
+    id: uid,
     ...resident,
+    role: resident.role || 'resident',
     createdAt: new Date().toISOString()
   };
 
-  await database.ref(`residents/${uid}`).set(profile);
-  await database.ref(`users/${uid}`).set({
-    email: resident.email || '',
-    role: resident.role || 'resident'
+  await database.ref().update({
+    [`residents/${uid}`]: profile,
+    [`users/${uid}`]: {
+      email: resident.email || '',
+      role: profile.role
+    }
   });
-  await database.ref('stats/totalResidents').transaction((current) => (current || 0) + 1);
+
+  try {
+    await database.ref('stats/totalResidents').transaction((current) => (current || 0) + 1);
+  } catch (error) {
+    if (isPermissionDeniedError(error)) {
+      console.info('[database] resident saved, but totalResidents counter was not updated because rules denied access.');
+      return;
+    }
+    throw error;
+  }
 }
 
 async function syncCurrentUserRole(user) {
