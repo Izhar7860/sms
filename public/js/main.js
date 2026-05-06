@@ -753,6 +753,7 @@ function initAdminForms() {
       name: formData.get('name')?.toString().trim(),
       email: formData.get('email')?.toString().trim(),
       flat: formData.get('flat')?.toString().trim(),
+      phone: formData.get('phone')?.toString().trim(),
       role: 'resident'
     };
 
@@ -1109,6 +1110,7 @@ async function createResidentProfile(uid, resident) {
     [`residents/${uid}`]: profile,
     [`users/${uid}`]: {
       email: resident.email || '',
+      phone: resident.phone || '',
       role: profile.role
     }
   });
