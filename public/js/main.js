@@ -613,12 +613,23 @@ function initForms() {
   initComplaintForms();
   initNoticeForm();
   initAdminForms();
+  initParkingAllocationForm();
 
   const payButtons = document.querySelectorAll('.pay-btn');
   payButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
       showToast('Redirecting to payment gateway... (Demo)', 'info');
     });
+  });
+}
+
+function initParkingAllocationForm() {
+  const allocationForm = document.getElementById('allocationForm');
+  if (!allocationForm) return;
+
+  allocationForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await saveAllocation();
   });
 }
 
@@ -848,6 +859,11 @@ async function saveParkingAllocation(allocation) {
 
   try {
     const allocationRef = database.ref('parkingAllocations').push();
+    const allocationRecord = {
+      ...allocation,
+      createdAt: new Date().toISOString(),
+      createdBy: auth?.currentUser?.email || 'system'
+    };
     const parkingSlot = await findParkingSlotRecord(allocation.slot);
     const slotRef = parkingSlot?.key
       ? database.ref(`parkingSlots/${parkingSlot.key}`)
@@ -861,7 +877,7 @@ async function saveParkingAllocation(allocation) {
     };
 
     await database.ref().update({
-      [`parkingAllocations/${allocationRef.key}`]: allocation,
+      [`parkingAllocations/${allocationRef.key}`]: allocationRecord,
       [`parkingSlots/${slotRef.key}`]: slotRecord
     });
 
@@ -1372,6 +1388,8 @@ window.showAllocationModal = function() {
 
 window.saveAllocation = async function() {
   const form = document.getElementById('allocationForm');
+  if (!form.reportValidity()) return;
+
   const formData = new FormData(form);
   const allocation = {
     slot: formData.get('slot')?.toString().trim(),
@@ -1385,6 +1403,18 @@ window.saveAllocation = async function() {
 
   if (!allocation.slot) {
     showToast('Please select a slot', 'warning');
+    return;
+  }
+
+  if (allocation.expiryDate && allocation.allocatedDate && allocation.expiryDate < allocation.allocatedDate) {
+    showToast('Expiry date cannot be before allocated date.', 'warning');
+    return;
+  }
+
+  const selectedSlot = window.SMSData.parkingSlots.find((slot) => slot.slot === allocation.slot);
+  const selectedSlotStatus = (selectedSlot?.status || 'available').toLowerCase();
+  if (selectedSlotStatus !== 'available') {
+    showToast(`${allocation.slot} is already ${selectedSlotStatus}. Choose an available slot.`, 'warning');
     return;
   }
 
