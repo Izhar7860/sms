@@ -433,6 +433,56 @@ function renderParkingSlotOptions() {
   }
 }
 
+function getParkingSlotInputElements() {
+  const form = document.getElementById('allocationForm');
+  if (!form) return {};
+
+  return {
+    form,
+    slotSelect: form.querySelector('[name="slot"]'),
+    createSlotToggle: form.querySelector('[name="createSlot"]'),
+    newSlotField: document.getElementById('new-slot-field'),
+    newSlotInput: form.querySelector('[name="newSlot"]')
+  };
+}
+
+function setParkingSlotCreationMode(enabled) {
+  const {
+    slotSelect,
+    createSlotToggle,
+    newSlotField,
+    newSlotInput
+  } = getParkingSlotInputElements();
+
+  if (!slotSelect || !createSlotToggle || !newSlotField || !newSlotInput) return;
+
+  createSlotToggle.checked = enabled;
+  newSlotField.classList.toggle('d-none', !enabled);
+  slotSelect.disabled = enabled;
+  slotSelect.required = !enabled;
+  newSlotInput.disabled = !enabled;
+  newSlotInput.required = enabled;
+
+  if (enabled) {
+    slotSelect.value = '';
+  } else {
+    newSlotInput.value = '';
+  }
+}
+
+function normalizeParkingSlotName(value) {
+  return (value || '')
+    .toString()
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toUpperCase();
+}
+
+function parkingSlotExists(slotName) {
+  const normalizedSlotName = normalizeParkingSlotName(slotName);
+  return window.SMSData.parkingSlots.some((slot) => normalizeParkingSlotName(slot.slot) === normalizedSlotName);
+}
+
 function findAllocationForSlot(slot) {
   const allocationId = slot.allocationId;
   if (allocationId) {
@@ -662,6 +712,7 @@ function initParkingAllocationForm() {
   const allocationForm = document.getElementById('allocationForm');
   const addButton = document.getElementById('add-allocation-btn');
   const saveButton = document.getElementById('save-allocation-btn');
+  const { createSlotToggle } = getParkingSlotInputElements();
 
   if (addButton) {
     addButton.addEventListener('click', window.showAllocationModal);
@@ -674,6 +725,14 @@ function initParkingAllocationForm() {
   }
 
   if (!allocationForm) return;
+
+  if (createSlotToggle) {
+    createSlotToggle.addEventListener('change', (event) => {
+      setParkingSlotCreationMode(event.target.checked);
+    });
+  }
+
+  setParkingSlotCreationMode(Boolean(createSlotToggle?.checked));
 
   allocationForm.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -1474,7 +1533,9 @@ window.showAllocationModal = function() {
   if (!modalEl || !form) return;
 
   const modal = new bootstrap.Modal(modalEl);
+  form.reset();
   renderParkingSlotOptions();
+  setParkingSlotCreationMode(false);
   const today = new Date();
   const nextYear = new Date(today);
   nextYear.setFullYear(today.getFullYear() + 1);
@@ -1491,8 +1552,11 @@ window.saveAllocation = async function() {
   if (!form.reportValidity()) return;
 
   const formData = new FormData(form);
+  const createNewSlot = formData.get('createSlot') === 'on';
+  const selectedSlot = normalizeParkingSlotName(formData.get('slot'));
+  const newSlot = normalizeParkingSlotName(formData.get('newSlot'));
   const allocation = {
-    slot: formData.get('slot')?.toString().trim(),
+    slot: createNewSlot ? newSlot : selectedSlot,
     location: formData.get('location')?.toString().trim(),
     ownerName: formData.get('ownerName')?.toString().trim(),
     flat: formData.get('flat')?.toString().trim(),
@@ -1503,7 +1567,7 @@ window.saveAllocation = async function() {
   };
 
   if (!allocation.slot) {
-    showToast('Please select a slot', 'warning');
+    showToast(createNewSlot ? 'Please enter a new slot name' : 'Please select a slot', 'warning');
     return;
   }
 
@@ -1512,14 +1576,19 @@ window.saveAllocation = async function() {
     return;
   }
 
+  if (createNewSlot && parkingSlotExists(allocation.slot)) {
+    showToast(`${allocation.slot} already exists. Choose another slot name.`, 'warning');
+    return;
+  }
+
   if (allocation.expiryDate && allocation.allocatedDate && allocation.expiryDate < allocation.allocatedDate) {
     showToast('Expiry date cannot be before allocated date.', 'warning');
     return;
   }
 
-  const selectedSlot = window.SMSData.parkingSlots.find((slot) => slot.slot === allocation.slot);
-  const selectedSlotStatus = (selectedSlot?.status || 'available').toLowerCase();
-  if (selectedSlotStatus !== 'available') {
+  const existingSlot = window.SMSData.parkingSlots.find((slot) => normalizeParkingSlotName(slot.slot) === allocation.slot);
+  const selectedSlotStatus = (existingSlot?.status || 'available').toLowerCase();
+  if (existingSlot && selectedSlotStatus !== 'available') {
     showToast(`${allocation.slot} is already ${selectedSlotStatus}. Choose an available slot.`, 'warning');
     return;
   }

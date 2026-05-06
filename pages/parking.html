@@ -216,6 +216,17 @@
                                 <select class="form-select" name="slot" required>
                                     <option value="">Choose slot...</option>
                                 </select>
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" id="create-slot-toggle" name="createSlot">
+                                    <label class="form-check-label" for="create-slot-toggle">
+                                        Create a new parking slot while allocating
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3 d-none" id="new-slot-field">
+                                <label class="form-label">New Slot Name</label>
+                                <input type="text" class="form-control" name="newSlot" placeholder="Example: P-09">
+                                <div class="form-text">Use a unique slot name for the new parking space.</div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Parking Location</label>
