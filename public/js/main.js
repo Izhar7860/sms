@@ -762,13 +762,15 @@ function initAdminForms() {
     submitBtn.disabled = true;
 
     try {
+      const temporaryPassword = generateTemporaryPassword();
+
       // 1. Create the user via Backend API
       const response = await fetch('/api/auth/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: resident.email,
-          password: formData.get('password'),
+          password: temporaryPassword,
           role: resident.role,
           displayName: resident.name
         })
@@ -780,7 +782,16 @@ function initAdminForms() {
       // 2. Add resident details to Realtime Database
       await createResidentProfile(data.localId, resident);
 
-      setAuthStatus(statusEl, 'success', 'Resident account created and saved to database.');
+      // 3. Send password setup email to resident
+      const resetResponse = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resident.email })
+      });
+      const resetData = await resetResponse.json();
+      if (!resetResponse.ok) throw new Error(resetData.error || 'Resident created, but password setup email could not be sent.');
+
+      setAuthStatus(statusEl, 'success', 'Resident account created. Password setup email sent.');
       addResidentForm.reset();
       
       // Close modal after delay
@@ -797,6 +808,15 @@ function initAdminForms() {
       submitBtn.disabled = false;
     }
   });
+}
+
+function generateTemporaryPassword(length = 14) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+  let password = '';
+  for (let index = 0; index < length; index += 1) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
 }
 
 function initComplaintForms() {
