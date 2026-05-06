@@ -38,12 +38,12 @@ const defaultSMSData = {
     { id: 2, title: 'Parking Rules Update', date: '2024-01-18', content: 'New visitor parking policy.', target: 'All Residents' }
   ],
   parkingSlots: [
-    { id: 1, slot: 'P-01', status: 'available' },
-    { id: 2, slot: 'P-02', status: 'occupied' },
-    { id: 3, slot: 'P-03', status: 'available' },
-    { id: 4, slot: 'P-04', status: 'occupied' },
-    { id: 5, slot: 'P-05', status: 'reserved' },
-    { id: 6, slot: 'P-06', status: 'available' }
+    { id: 1, slot: 'P-01', location: 'Ground Floor', status: 'available' },
+    { id: 2, slot: 'P-02', location: 'Ground Floor', status: 'occupied' },
+    { id: 3, slot: 'P-03', location: 'Underground Basement', status: 'available' },
+    { id: 4, slot: 'P-04', location: 'Underground Basement', status: 'occupied' },
+    { id: 5, slot: 'P-05', location: 'First Floor', status: 'reserved' },
+    { id: 6, slot: 'P-06', location: 'First Floor', status: 'available' }
   ],
   parkingAllocations: []
 };
@@ -402,9 +402,10 @@ function renderParkingGrid() {
     const status = slot.status || 'available';
     slotEl.className = `parking-slot ${status}`;
     slotEl.textContent = slotName;
+    const location = allocation?.location || slot.location || 'Location not set';
     slotEl.title = allocation
-      ? `${capitalize(status)} - ${allocation.ownerName || 'Allocated'} (${allocation.flat || 'Flat not set'}) - ${allocation.location || 'Location not set'}`
-      : capitalize(status);
+      ? `${capitalize(status)} - ${allocation.ownerName || 'Allocated'} (${allocation.flat || 'Flat not set'}) - ${location}`
+      : `${capitalize(status)} - ${location}`;
     container.appendChild(slotEl);
   });
 }
@@ -421,9 +422,10 @@ function renderParkingSlotOptions() {
     const status = (slot.status || 'available').toLowerCase();
     const option = document.createElement('option');
     option.value = slotName;
+    const slotLocation = slot.location ? ` - ${slot.location}` : '';
     option.textContent = status === 'available'
-      ? slotName
-      : `${slotName} (${capitalize(status)})`;
+      ? `${slotName}${slotLocation}`
+      : `${slotName}${slotLocation} (${capitalize(status)})`;
     option.disabled = status !== 'available' && slotName !== selectedSlot;
     select.appendChild(option);
   });
@@ -698,6 +700,7 @@ function initForms() {
   initComplaintForms();
   initNoticeForm();
   initAdminForms();
+  initParkingSlotForm();
   initParkingAllocationForm();
 
   const payButtons = document.querySelectorAll('.pay-btn');
@@ -737,6 +740,58 @@ function initParkingAllocationForm() {
   allocationForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     await window.saveAllocation();
+  });
+}
+
+function initParkingSlotForm() {
+  const slotForm = document.getElementById('parking-slot-form');
+  const submitButton = document.getElementById('add-parking-slot-btn');
+  if (!slotForm) return;
+
+  slotForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!slotForm.reportValidity()) return;
+
+    const formData = new FormData(slotForm);
+    const parkingSlot = {
+      slot: normalizeParkingSlotName(formData.get('slotName')),
+      location: formData.get('location')?.toString().trim(),
+      status: formData.get('status')?.toString().trim() || 'available'
+    };
+
+    if (!parkingSlot.slot) {
+      showToast('Please enter a slot name', 'warning');
+      return;
+    }
+
+    if (parkingSlotExists(parkingSlot.slot)) {
+      showToast(`${parkingSlot.slot} already exists. Choose another slot name.`, 'warning');
+      return;
+    }
+
+    try {
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = 'Adding...';
+      }
+
+      const ref = await saveParkingSlot(parkingSlot);
+      showToast(
+        ref?.localOnly
+          ? 'Parking slot saved locally. Firebase rules are still blocking database writes.'
+          : 'Parking slot added successfully!',
+        ref?.localOnly ? 'warning' : 'success'
+      );
+      slotForm.reset();
+      renderParkingSlotOptions();
+    } catch (error) {
+      showToast(error.message || 'Failed to add parking slot.', 'danger');
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Add Slot';
+      }
+    }
   });
 }
 
@@ -969,6 +1024,7 @@ async function seedDefaultParkingSlots() {
     const key = `slot${slot.id || slot.slot?.replace(/\D/g, '')}`;
     updates[`parkingSlots/${key}`] = {
       slot: slot.slot,
+      location: slot.location || '',
       status: slot.status || 'available'
     };
   });
@@ -982,6 +1038,36 @@ async function seedDefaultParkingSlots() {
       return;
     }
     console.error('[database] failed to seed parking slots', error);
+  }
+}
+
+async function saveParkingSlot(parkingSlot) {
+  ensureDatabaseAvailable('save parking slot');
+
+  try {
+    const existingSlot = await findParkingSlotRecord(parkingSlot.slot);
+    if (existingSlot?.key) {
+      throw new Error(`${parkingSlot.slot} already exists.`);
+    }
+
+    const slotRef = database.ref('parkingSlots').push();
+    const slotRecord = {
+      slot: parkingSlot.slot,
+      location: parkingSlot.location || '',
+      status: (parkingSlot.status || 'available').toLowerCase()
+    };
+
+    await database.ref().update({
+      [`parkingSlots/${slotRef.key}`]: slotRecord
+    });
+
+    return slotRef;
+  } catch (error) {
+    console.error('[database] failed to save parking slot', error);
+    if (isPermissionDeniedError(error)) {
+      return saveLocalParkingSlot(parkingSlot);
+    }
+    throw error instanceof Error ? error : new Error('Unable to save parking slot to Firebase.');
   }
 }
 
@@ -1003,6 +1089,7 @@ async function saveParkingAllocation(allocation) {
     const slotRecord = {
       ...(parkingSlot?.value || {}),
       slot: allocation.slot,
+      location: parkingSlot?.value?.location || allocation.location || '',
       status: getSlotStatusForAllocation(allocation.status),
       allocationId: allocationRef.key
     };
@@ -1040,6 +1127,18 @@ function getSlotStatusForAllocation(status) {
   return (status || '').toLowerCase() === 'active' ? 'occupied' : 'reserved';
 }
 
+function saveLocalParkingSlot(parkingSlot) {
+  const id = `local-slot-${Date.now()}`;
+  window.SMSData.parkingSlots.push({
+    id,
+    slot: parkingSlot.slot,
+    location: parkingSlot.location || '',
+    status: (parkingSlot.status || 'available').toLowerCase()
+  });
+  renderAppData();
+  return { key: id, localOnly: true };
+}
+
 function saveLocalParkingAllocation(allocation) {
   const id = `local-${Date.now()}`;
   const localAllocation = { id, ...allocation };
@@ -1052,12 +1151,14 @@ function saveLocalParkingAllocation(allocation) {
   ];
 
   if (existingSlot) {
+    existingSlot.location = existingSlot.location || allocation.location || '';
     existingSlot.status = slotStatus;
     existingSlot.allocationId = id;
   } else {
     window.SMSData.parkingSlots.push({
       id,
       slot: allocation.slot,
+      location: allocation.location || '',
       status: slotStatus,
       allocationId: id
     });

@@ -164,6 +164,45 @@
                 </div>
             </div>
 
+            <!-- Slot Management -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Add Parking Slot</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="parking-slot-form" class="row g-3 align-items-end">
+                                <div class="col-md-4">
+                                    <label class="form-label" for="parking-slot-name">Slot Name</label>
+                                    <input type="text" class="form-control" id="parking-slot-name" name="slotName" placeholder="Example: P-09" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="parking-slot-location">Location</label>
+                                    <select class="form-select" id="parking-slot-location" name="location" required>
+                                        <option value="">Choose location...</option>
+                                        <option value="Ground Floor">Ground Floor</option>
+                                        <option value="Underground Basement">Underground Basement</option>
+                                        <option value="First Floor">First Floor</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="parking-slot-status">Status</label>
+                                    <select class="form-select" id="parking-slot-status" name="status">
+                                        <option value="available">Available</option>
+                                        <option value="reserved">Reserved</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="submit" class="btn btn-primary w-100" id="add-parking-slot-btn">Add Slot</button>
+                                </div>
+                            </form>
+                            <div class="form-text mt-3">Admins can create additional parking slots here and allocate them to residents later.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Allocation Table -->
             <div class="row mt-4">
                 <div class="col-12">
