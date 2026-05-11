@@ -808,6 +808,7 @@ function initAdminForms() {
       name: formData.get('name')?.toString().trim(),
       email: formData.get('email')?.toString().trim(),
       flat: formData.get('flat')?.toString().trim(),
+      floorNumber: formData.get('floorNumber')?.toString().trim(),
       phone: formData.get('phone')?.toString().trim(),
       role: 'resident'
     };
