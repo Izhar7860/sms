@@ -45,8 +45,10 @@ const defaultSMSData = {
     { id: 5, slot: 'P-05', location: 'First Floor', status: 'reserved' },
     { id: 6, slot: 'P-06', location: 'First Floor', status: 'available' }
   ],
-  parkingAllocations: []
+  parkingAllocations: [],
+  visitorParking: []
 };
+
 
 window.SMSData = structuredClone
   ? structuredClone(defaultSMSData)
@@ -239,11 +241,17 @@ async function hydrateAppData() {
       window.SMSData.parkingAllocations = normalizeCollection(value, defaultSMSData.parkingAllocations);
       renderAppData();
     });
+
+    if (collections.has('visitorParking')) attachRealtimeCollection('visitorParking', defaultSMSData.visitorParking, (value) => {
+      window.SMSData.visitorParking = normalizeCollection(value, defaultSMSData.visitorParking);
+      renderAppData();
+    });
   } catch (error) {
     console.warn('[database] falling back to local demo data', error);
     renderAppData();
   }
 }
+
 
 function getPageDataCollections() {
   const collections = new Set();
@@ -274,8 +282,14 @@ function getPageDataCollections() {
     collections.add('parkingAllocations');
   }
 
+  // Visitors (visitor parking requests + optional slot allocation)
+  if (has('#visitor-form, #visitor-parking-table')) {
+    collections.add('visitorParking');
+  }
+
   return collections;
 }
+
 
 function attachRealtimeCollection(path, fallbackValue, onValue) {
   const ref = database.ref(path);
@@ -312,10 +326,13 @@ function renderAppData() {
   updateStats();
   renderParkingGrid();
   renderParkingSlotOptions();
+  populateVisitorSlotOptions();
   renderParkingAllocationsTable();
+  renderVisitorParkingTable();
   renderNotices();
   renderComplaints();
 }
+
 
 function notifyOnNewItems(type) {
   try {
@@ -764,6 +781,7 @@ function initForms() {
   initAdminForms();
   initParkingSlotForm();
   initParkingAllocationForm();
+  initVisitorForm();
 
   const payButtons = document.querySelectorAll('.pay-btn');
   payButtons.forEach((btn) => {
@@ -772,6 +790,7 @@ function initForms() {
     });
   });
 }
+
 
 function initParkingAllocationForm() {
   const allocationForm = document.getElementById('allocationForm');
@@ -1960,7 +1979,7 @@ window.editAllocation = function() {
 };
 
 function renderParkingAllocationsTable() {
-  const tbody = document.querySelector('#parking-allocations-table tbody, .table tbody');
+  const tbody = document.querySelector('#parking-allocations-table tbody');
   if (!tbody || !window.SMSData.parkingAllocations) return;
 
   tbody.innerHTML = '';
@@ -1979,9 +1998,9 @@ function renderParkingAllocationsTable() {
   window.SMSData.parkingAllocations.forEach((alloc) => {
     const row = document.createElement('tr');
     const statusBadge = alloc.status === 'active' 
-      ? 'badge bg-success' 
-      : alloc.status === 'pending' 
-        ? 'badge bg-warning text-dark' 
+      ? 'badge bg-success'
+      : alloc.status === 'pending'
+        ? 'badge bg-warning text-dark'
         : 'badge bg-secondary';
     row.innerHTML = `
       <td><strong>${escapeHtml(alloc.slot)}</strong></td>
@@ -2002,3 +2021,293 @@ function renderParkingAllocationsTable() {
     tbody.appendChild(row);
   });
 }
+
+function renderVisitorParkingTable() {
+  const tbody = document.querySelector('#visitor-parking-table tbody');
+  if (!tbody || !Array.isArray(window.SMSData?.visitorParking)) return;
+
+  tbody.innerHTML = '';
+
+  if (!window.SMSData.visitorParking.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" class="text-center text-muted py-4">
+          <i class="fas fa-user-clock fs-1 text-muted mb-3"></i>
+          No visitor entries
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  window.SMSData.visitorParking.forEach((entry) => {
+    const row = document.createElement('tr');
+    const statusBadge = entry.status === 'active'
+      ? 'badge bg-success'
+      : entry.status === 'pending'
+        ? 'badge bg-warning text-dark'
+        : 'badge bg-secondary';
+
+    row.innerHTML = `
+      <td><strong>${escapeHtml(entry.visitorName)}</strong></td>
+      <td>${escapeHtml(entry.vehicleNumber)}</td>
+      <td>${escapeHtml(entry.flat || '-')}</td>
+      <td>${escapeHtml(entry.purpose || '-')}</td>
+      <td>${escapeHtml(entry.slot || '-')}</td>
+      <td><span class="${statusBadge}">${escapeHtml(capitalize(entry.status))}</span></td>
+      <td>
+        <button class="btn btn-sm btn-outline-danger" onclick="deleteVisitorEntry('${escapeHtml(entry.id)}')">
+          <i class="fas fa-trash"></i>
+        </button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+function initVisitorForm() {
+  const form = document.getElementById('visitor-form');
+  const allocateToggle = document.getElementById('visitor-allocate-toggle');
+  const slotSelect = document.getElementById('visitor-slot');
+  const allocatedDateInput = document.getElementById('visitor-allocated-date');
+  const expiryDateInput = document.getElementById('visitor-expiry-date');
+
+  if (!form || !slotSelect || !allocateToggle) return;
+
+  // Populate slot dropdown with available slots (and allow currently selected when updating)
+  populateVisitorSlotOptions();
+  setDefaultVisitorDates(allocatedDateInput, expiryDateInput);
+
+  const toggleSlotMode = () => {
+    const enabled = allocateToggle.checked;
+    slotSelect.disabled = !enabled;
+    slotSelect.required = enabled;
+    slotSelect.closest('#visitor-slot-wrap').classList.toggle('d-none', !enabled);
+  };
+
+  allocateToggle.addEventListener('change', () => {
+    populateVisitorSlotOptions();
+    toggleSlotMode();
+  });
+
+  toggleSlotMode();
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+
+    const formData = new FormData(form);
+    const entry = {
+      visitorName: formData.get('visitorName')?.toString().trim(),
+      vehicleNumber: formData.get('vehicleNumber')?.toString().trim(),
+      flat: formData.get('flat')?.toString().trim(),
+      purpose: formData.get('purpose')?.toString().trim(),
+      status: formData.get('status')?.toString().trim() || 'active',
+      allocateSlot: formData.get('allocateSlot') === 'on',
+      slot: allocateToggle.checked ? normalizeParkingSlotName(formData.get('slot')) : '',
+      allocatedDate: formData.get('allocatedDate'),
+      expiryDate: formData.get('expiryDate')
+    };
+
+    if (entry.allocateSlot) {
+      if (!entry.slot) {
+        showToast('Please select a slot for visitor allocation.', 'warning');
+        return;
+      }
+      const slotRecord = window.SMSData.parkingSlots.find((s) => normalizeParkingSlotName(s.slot) === entry.slot);
+      if (!slotRecord) {
+        showToast('Selected slot does not exist.', 'warning');
+        return;
+      }
+      if ((slotRecord.status || '').toLowerCase() !== 'available') {
+        showToast(`${entry.slot} is not available. Choose another slot.`, 'warning');
+        return;
+      }
+    }
+
+    try {
+      await saveVisitorParkingEntry(entry);
+      form.reset();
+      // Re-apply slot mode after reset
+      setDefaultVisitorDates(allocatedDateInput, expiryDateInput);
+      populateVisitorSlotOptions();
+      toggleSlotMode();
+    } catch (e) {
+      showToast(e.message || 'Failed to add visitor entry.', 'danger');
+    }
+  });
+}
+
+function populateVisitorSlotOptions() {
+  const slotSelect = document.getElementById('visitor-slot');
+  const allocateToggle = document.getElementById('visitor-allocate-toggle');
+  if (!slotSelect || !allocateToggle) return;
+
+  const currentValue = slotSelect.value;
+  slotSelect.innerHTML = '<option value="">Choose slot...</option>';
+
+  window.SMSData.parkingSlots.forEach((slot) => {
+    const status = (slot.status || 'available').toLowerCase();
+    if (!allocateToggle.checked) return;
+    if (status !== 'available') return;
+
+    const opt = document.createElement('option');
+    opt.value = slot.slot;
+    opt.textContent = `${slot.slot}${slot.location ? ` - ${slot.location}` : ''}`;
+    slotSelect.appendChild(opt);
+  });
+
+  if ([...slotSelect.options].some((o) => normalizeParkingSlotName(o.value) === normalizeParkingSlotName(currentValue))) {
+    slotSelect.value = currentValue;
+  }
+}
+
+async function saveVisitorParkingEntry(entry) {
+  try {
+    ensureDatabaseAvailable('save visitor parking');
+
+    const visitorRef = await database.ref('visitorParking').push({
+      visitorName: entry.visitorName,
+      vehicleNumber: entry.vehicleNumber,
+      flat: entry.flat || '',
+      purpose: entry.purpose || '',
+      status: entry.status,
+      allocatedDate: entry.allocatedDate,
+      expiryDate: entry.expiryDate,
+      createdAt: new Date().toISOString(),
+      allocatedSlot: Boolean(entry.allocateSlot)
+    });
+
+    let savedAllocation = null;
+
+    if (entry.allocateSlot) {
+      const allocation = getVisitorParkingAllocation(entry);
+      savedAllocation = await saveParkingAllocation(allocation);
+
+      await database.ref('visitorParking').child(visitorRef.key).update({
+        slot: entry.slot,
+        allocationId: savedAllocation?.key || null,
+        parkingLocation: allocation.location || ''
+      });
+    }
+
+    showToast('Visitor entry saved.', 'success');
+    return visitorRef;
+  } catch (error) {
+    console.error('[database] failed to save visitor parking', error);
+    if (isPermissionDeniedError(error) || !database) {
+      const ref = saveLocalVisitorParkingEntry(entry);
+      showToast('Visitor entry saved locally. Firebase rules are still blocking visitor writes.', 'warning');
+      return ref;
+    }
+    throw new Error('Unable to save visitor entry to Firebase.');
+  }
+}
+
+function getVisitorParkingAllocation(entry) {
+  return {
+    slot: entry.slot,
+    location: (window.SMSData.parkingSlots.find((s) => normalizeParkingSlotName(s.slot) === entry.slot)?.location || '').toString().trim(),
+    ownerName: entry.visitorName,
+    flat: entry.flat || '-',
+    vehicleNumber: entry.vehicleNumber,
+    status: entry.status === 'pending' ? 'pending' : 'active',
+    allocatedDate: entry.allocatedDate,
+    expiryDate: entry.expiryDate
+  };
+}
+
+function saveLocalVisitorParkingEntry(entry) {
+  const id = `local-visitor-${Date.now()}`;
+  let allocationRef = null;
+  let parkingLocation = '';
+
+  if (entry.allocateSlot) {
+    const allocation = getVisitorParkingAllocation(entry);
+    parkingLocation = allocation.location || '';
+    allocationRef = saveLocalParkingAllocation(allocation);
+  }
+
+  window.SMSData.visitorParking = [
+    {
+      id,
+      visitorName: entry.visitorName,
+      vehicleNumber: entry.vehicleNumber,
+      flat: entry.flat || '',
+      purpose: entry.purpose || '',
+      status: entry.status,
+      slot: entry.allocateSlot ? entry.slot : '',
+      allocationId: allocationRef?.key || null,
+      parkingLocation,
+      allocatedDate: entry.allocatedDate,
+      expiryDate: entry.expiryDate,
+      createdAt: new Date().toISOString(),
+      allocatedSlot: Boolean(entry.allocateSlot)
+    },
+    ...(window.SMSData.visitorParking || [])
+  ];
+
+  renderAppData();
+  return { key: id, localOnly: true };
+}
+
+function setDefaultVisitorDates(allocatedDateInput, expiryDateInput) {
+  if (!allocatedDateInput || !expiryDateInput) return;
+
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+
+  allocatedDateInput.value = today.toISOString().split('T')[0];
+  expiryDateInput.value = tomorrow.toISOString().split('T')[0];
+}
+
+window.deleteVisitorEntry = async function(id) {
+  if (!id || !confirm('Delete this visitor entry?')) return;
+
+  try {
+    // Find visitor and if it has allocationId/slot, free slot by deleting allocation if we can.
+    const entry = (window.SMSData.visitorParking || []).find((v) => v.id === id);
+
+    if (id.startsWith('local-') && entry) {
+      window.SMSData.visitorParking = window.SMSData.visitorParking.filter((v) => v.id !== id);
+      if (entry.allocationId) {
+        window.SMSData.parkingAllocations = window.SMSData.parkingAllocations.filter((item) => item.id !== entry.allocationId);
+      }
+      if (entry.slot) {
+        const slotRec = window.SMSData.parkingSlots.find((s) => normalizeParkingSlotName(s.slot) === normalizeParkingSlotName(entry.slot));
+        if (slotRec) {
+          slotRec.status = 'available';
+          delete slotRec.allocationId;
+        }
+      }
+      renderAppData();
+      showToast('Visitor entry deleted locally.', 'success');
+      return;
+    }
+
+    ensureDatabaseAvailable('delete visitor parking entry');
+
+    // Best effort: if we stored slot but not allocation id, just free slot status.
+    const updates = {};
+    updates[`visitorParking/${id}`] = null;
+
+    if (entry?.slot) {
+      const slotRecord = await findParkingSlotRecord(entry.slot);
+      if (slotRecord?.key) {
+        updates[`parkingSlots/${slotRecord.key}/status`] = 'available';
+        updates[`parkingSlots/${slotRecord.key}/allocationId`] = null;
+      }
+    }
+
+    if (entry?.allocationId) {
+      updates[`parkingAllocations/${entry.allocationId}`] = null;
+    }
+
+    await database.ref().update(updates);
+    showToast('Visitor entry deleted.', 'success');
+  } catch (e) {
+    showToast(e.message || 'Failed to delete visitor entry.', 'danger');
+  }
+};
+

@@ -35,6 +35,10 @@
     "parkingAllocations": {
       ".read": "auth != null",
       ".write": "root.child('users/' + auth.uid + '/role').val() === 'admin'"
+    },
+    "visitorParking": {
+      ".read": "auth != null",
+      ".write": "root.child('users/' + auth.uid + '/role').val() === 'admin'"
     }
   }
 }

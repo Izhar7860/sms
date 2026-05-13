@@ -236,8 +236,109 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Visitors Section -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Visitors</h5>
+                            <span class="text-muted small">Visitor parking requests & temporary slot allocation</span>
+                        </div>
+                        <div class="card-body">
+                            <form id="visitor-form" class="row g-3 align-items-end">
+                                <div class="col-md-3">
+                                    <label class="form-label" for="visitor-name">Visitor Name</label>
+                                    <input type="text" class="form-control" id="visitor-name" name="visitorName" placeholder="Example: John Doe" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="visitor-vehicle">Vehicle Number</label>
+                                    <input type="text" class="form-control" id="visitor-vehicle" name="vehicleNumber" placeholder="Example: KA01 AB 1234" required>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="visitor-flat">Flat (Optional)</label>
+                                    <input type="text" class="form-control" id="visitor-flat" name="flat" placeholder="Example: 3B">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="visitor-purpose">Purpose (Optional)</label>
+                                    <input type="text" class="form-control" id="visitor-purpose" name="purpose" placeholder="Example: Meeting">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="visitor-status">Entry Status</label>
+                                    <select class="form-select" id="visitor-status" name="status" required>
+                                        <option value="active" selected>Active</option>
+                                        <option value="pending">Pending</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-12">
+                                    <hr class="my-2">
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="visitor-allocate-toggle" name="allocateSlot">
+                                        <label class="form-check-label" for="visitor-allocate-toggle">
+                                            Allocate a parking slot now
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4" id="visitor-slot-wrap">
+                                    <label class="form-label" for="visitor-slot">Select Slot</label>
+                                    <select class="form-select" id="visitor-slot" name="slot">
+                                        <option value="">Choose slot...</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="visitor-allocated-date">Allocated Date</label>
+                                    <input type="date" class="form-control" id="visitor-allocated-date" name="allocatedDate" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="visitor-expiry-date">Expiry Date</label>
+                                    <input type="date" class="form-control" id="visitor-expiry-date" name="expiryDate" required>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <button type="submit" class="btn btn-primary w-100" id="add-visitor-btn">
+                                        Add Visitor
+                                    </button>
+                                </div>
+                                <div class="col-12">
+                                    <div class="form-text">
+                                        If slot allocation is enabled, the system will create a temporary parking allocation and update slot status.
+                                    </div>
+                                </div>
+                            </form>
+
+                            <div class="row mt-4">
+                                <div class="col-12">
+                                    <div class="table-responsive">
+                                        <table class="table" id="visitor-parking-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Visitor</th>
+                                                    <th>Vehicle</th>
+                                                    <th>Flat</th>
+                                                    <th>Purpose</th>
+                                                    <th>Slot</th>
+                                                    <th>Status</th>
+                                                    <th>Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <!-- Dynamic content populated by JS -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
+
 
     <!-- Allocation Modal -->
     <div class="modal fade" id="allocationModal" tabindex="-1">
@@ -322,6 +423,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     <script src="../public/js/firebase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="../public/js/main.js?v=6"></script>
+    <script src="../public/js/main.js?v=7"></script>
 </body>
 </html>
