@@ -883,32 +883,14 @@ function initAdminForms() {
     try {
       const temporaryPassword = generateTemporaryPassword();
 
-      // 1. Create the user via Backend API
-      const response = await fetch('/api/auth/create-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: resident.email,
-          password: temporaryPassword,
-          role: resident.role,
-          displayName: resident.name
-        })
-      });
-
-      const data = await readApiResponse(response, 'Failed to create resident account');
-      if (!response.ok) throw new Error(data.error || 'Failed to create resident account');
+      // 1. Create the user via Backend API, with a Firebase client fallback for static deployments.
+      const data = await createResidentAuthAccount(resident, temporaryPassword);
 
       // 2. Add resident details to Realtime Database
       await createResidentProfile(data.localId, resident);
 
       // 3. Send password setup email to resident
-      const resetResponse = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: resident.email })
-      });
-      const resetData = await readApiResponse(resetResponse, 'Resident created, but password setup email could not be sent.');
-      if (!resetResponse.ok) throw new Error(resetData.error || 'Resident created, but password setup email could not be sent.');
+      await sendResidentPasswordSetupEmail(resident.email);
 
       setAuthStatus(statusEl, 'success', 'Resident account created. Password setup email sent.');
       addResidentForm.reset();
@@ -927,6 +909,106 @@ function initAdminForms() {
       submitBtn.disabled = false;
     }
   });
+}
+
+async function createResidentAuthAccount(resident, password) {
+  try {
+    return await createResidentViaBackend(resident, password);
+  } catch (error) {
+    if (!shouldUseClientAuthFallback(error)) {
+      throw error;
+    }
+
+    console.warn('[admin] create-user API unavailable, falling back to Firebase client auth', error);
+    return createResidentViaSecondaryAuth(resident, password);
+  }
+}
+
+async function createResidentViaBackend(resident, password) {
+  let response;
+
+  try {
+    response = await fetch('/api/auth/create-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: resident.email,
+        password,
+        role: resident.role,
+        displayName: resident.name
+      })
+    });
+  } catch (error) {
+    error.apiUnavailable = true;
+    throw error;
+  }
+
+  const data = await readApiResponse(response, 'Failed to create resident account');
+  if (!response.ok) {
+    const error = new Error(data.error || `Failed to create resident account (HTTP ${response.status})`);
+    error.status = response.status;
+    error.apiUnavailable = response.status === 404 || response.status === 405 || response.status >= 500;
+    throw error;
+  }
+
+  if (!data.localId) {
+    const error = new Error('Backend created the resident account but did not return a Firebase user id.');
+    error.apiUnavailable = true;
+    throw error;
+  }
+
+  return data;
+}
+
+async function createResidentViaSecondaryAuth(resident, password) {
+  if (!firebaseApp || !runtimeFirebaseConfig.apiKey) {
+    throw new Error('Firebase is not configured, so the resident account cannot be created.');
+  }
+
+  const secondaryAppName = `resident-create-${Date.now()}`;
+  const secondaryApp = firebase.initializeApp(runtimeFirebaseConfig, secondaryAppName);
+  const secondaryAuth = secondaryApp.auth();
+
+  try {
+    const userCredential = await secondaryAuth.createUserWithEmailAndPassword(resident.email, password);
+    await userCredential.user.updateProfile({ displayName: resident.role || 'resident' });
+    return {
+      status: 'success',
+      email: userCredential.user.email,
+      localId: userCredential.user.uid
+    };
+  } finally {
+    await secondaryAuth.signOut().catch(() => {});
+    await secondaryApp.delete().catch(() => {});
+  }
+}
+
+async function sendResidentPasswordSetupEmail(email) {
+  try {
+    const resetResponse = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+      });
+      const resetData = await readApiResponse(resetResponse, 'Resident created, but password setup email could not be sent.');
+    if (!resetResponse.ok) {
+      const error = new Error(resetData.error || `Resident created, but password setup email could not be sent (HTTP ${resetResponse.status}).`);
+      error.status = resetResponse.status;
+      error.apiUnavailable = resetResponse.status === 404 || resetResponse.status === 405 || resetResponse.status >= 500;
+      throw error;
+    }
+  } catch (error) {
+    if (!shouldUseClientAuthFallback(error)) {
+      throw error;
+    }
+
+    console.warn('[admin] reset-password API unavailable, falling back to Firebase client auth', error);
+    await auth.sendPasswordResetEmail(email, { url: getEmailRedirectUrl() });
+  }
+}
+
+function shouldUseClientAuthFallback(error) {
+  return Boolean(error?.apiUnavailable || error instanceof TypeError);
 }
 
 function generateTemporaryPassword(length = 14) {
