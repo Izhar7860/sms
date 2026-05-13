@@ -102,6 +102,11 @@ let parkingSlotsSeeded = false;
 let parkingAllocationSaving = false;
 const localComplaintsStorageKey = 'sms_local_complaints';
 
+// Realtime “new notice/complaint” in-app notifications
+let lastNoticesSignature = '';
+let lastComplaintsSignature = '';
+
+
 document.addEventListener('DOMContentLoaded', async () => {
   initSidebar();
   setActiveNavLink();
@@ -209,13 +214,16 @@ async function hydrateAppData() {
     if (collections.has('complaints')) attachRealtimeCollection('complaints', defaultSMSData.complaints, (value) => {
       window.SMSData.complaints = normalizeCollection(value, defaultSMSData.complaints);
       window.SMSData.stats.complaints = window.SMSData.complaints.length;
+      notifyOnNewItems('complaint');
       renderAppData();
     });
 
     if (collections.has('notices')) attachRealtimeCollection('notices', defaultSMSData.notices, (value) => {
       window.SMSData.notices = normalizeCollection(value, defaultSMSData.notices);
+      notifyOnNewItems('notice');
       renderAppData();
     });
+
 
     if (collections.has('parkingSlots')) attachRealtimeCollection('parkingSlots', defaultSMSData.parkingSlots, (value, rawValue, error) => {
       window.SMSData.parkingSlots = rawValue
@@ -308,6 +316,60 @@ function renderAppData() {
   renderNotices();
   renderComplaints();
 }
+
+function notifyOnNewItems(type) {
+  try {
+    const nowNotices = Array.isArray(window.SMSData?.notices) ? window.SMSData.notices : [];
+    const nowComplaints = Array.isArray(window.SMSData?.complaints) ? window.SMSData.complaints : [];
+
+    if (type === 'notice') {
+      const signature = nowNotices
+        .slice(0, 50)
+        .map((n) => `${n.id || ''}|${n.title || ''}|${n.date || ''}`)
+        .join('~');
+
+      if (!lastNoticesSignature) {
+        lastNoticesSignature = signature;
+        return;
+      }
+
+      if (signature !== lastNoticesSignature) {
+        const newest = nowNotices[0];
+        const newestTitle = newest?.title || 'New Notice';
+        showToast(`🔔 New notice: ${newestTitle}`, 'info');
+
+        lastNoticesSignature = signature;
+      }
+
+
+      return;
+    }
+
+    if (type === 'complaint') {
+      const signature = nowComplaints
+        .slice(0, 50)
+        .map((c) => `${c.id || ''}|${c.title || c.subject || ''}|${c.date || ''}`)
+        .join('~');
+
+      if (!lastComplaintsSignature) {
+        lastComplaintsSignature = signature;
+        return;
+      }
+
+      if (signature !== lastComplaintsSignature) {
+        const newest = nowComplaints[0];
+        const newestSubject = newest?.title || newest?.subject || 'New Complaint';
+        showToast(`🚨 New complaint: ${newestSubject}`, 'warning');
+        lastComplaintsSignature = signature;
+        return;
+      }
+
+    }
+  } catch (e) {
+    console.warn('[notify] failed', e);
+  }
+}
+
 
 function normalizeCollection(value, fallback) {
   if (!value) return [...fallback];
@@ -808,6 +870,7 @@ function initAdminForms() {
       name: formData.get('name')?.toString().trim(),
       email: formData.get('email')?.toString().trim(),
       flat: formData.get('flat')?.toString().trim(),
+      floorNumber: formData.get('floorNumber')?.toString().trim(),
       phone: formData.get('phone')?.toString().trim(),
       role: 'resident'
     };
