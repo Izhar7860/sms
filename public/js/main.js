@@ -1763,6 +1763,9 @@ function getDashboardPath(role) {
 
 function getEmailRedirectUrl() {
   const url = new URL(window.location.href);
+  if (url.hostname === '127.0.0.1' || url.hostname === '0.0.0.0') {
+    url.hostname = 'localhost';
+  }
   url.pathname = `${pathname.substring(0, pathname.lastIndexOf('/'))}${isPagesRoute ? '/login.html' : '/pages/login.html'}`;
   url.search = '';
   url.hash = '';
