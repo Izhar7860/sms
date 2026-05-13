@@ -24,7 +24,7 @@ async function callFirebase(action, payload) {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json();
+  const data = await readJsonResponse(response);
   if (!response.ok) {
     const error = new Error(data.error?.message || 'Firebase Auth request failed');
     error.status = response.status;
@@ -32,6 +32,29 @@ async function callFirebase(action, payload) {
   }
 
   return data;
+}
+
+async function readJsonResponse(response) {
+  const contentType = response.headers.get('content-type') || '';
+  const body = await response.text();
+
+  if (!body.trim()) {
+    return {};
+  }
+
+  if (!contentType.includes('application/json')) {
+    const error = new Error(`Firebase Auth returned a non-JSON response: ${body.slice(0, 120)}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  try {
+    return JSON.parse(body);
+  } catch (parseError) {
+    const error = new Error('Firebase Auth returned invalid JSON.');
+    error.status = response.status;
+    throw error;
+  }
 }
 
 function sendJson(res, status, data) {

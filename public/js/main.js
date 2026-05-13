@@ -895,7 +895,7 @@ function initAdminForms() {
         })
       });
 
-      const data = await response.json();
+      const data = await readApiResponse(response, 'Failed to create resident account');
       if (!response.ok) throw new Error(data.error || 'Failed to create resident account');
 
       // 2. Add resident details to Realtime Database
@@ -907,7 +907,7 @@ function initAdminForms() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: resident.email })
       });
-      const resetData = await resetResponse.json();
+      const resetData = await readApiResponse(resetResponse, 'Resident created, but password setup email could not be sent.');
       if (!resetResponse.ok) throw new Error(resetData.error || 'Resident created, but password setup email could not be sent.');
 
       setAuthStatus(statusEl, 'success', 'Resident account created. Password setup email sent.');
@@ -936,6 +936,29 @@ function generateTemporaryPassword(length = 14) {
     password += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return password;
+}
+
+async function readApiResponse(response, fallbackMessage = 'Request failed') {
+  const contentType = response.headers.get('content-type') || '';
+  const body = await response.text();
+
+  if (!body.trim()) {
+    return {};
+  }
+
+  if (contentType.includes('application/json')) {
+    try {
+      return JSON.parse(body);
+    } catch (error) {
+      throw new Error(`${fallbackMessage}: backend returned invalid JSON.`);
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(`${fallbackMessage}: ${body.slice(0, 180)}`);
+  }
+
+  return { message: body };
 }
 
 function initComplaintForms() {
