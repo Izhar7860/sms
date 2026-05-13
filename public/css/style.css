@@ -1,20 +1,54 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
+  /* Neumorphism palette (light) */
   --primary-color: #cb997e;
   --primary-dark: #b58062;
-  --primary-light: #f5ebe4;
+  --primary-light: #e0e5ec;
+
   --secondary-color: #6c757d;
   --success-color: #28a745;
   --danger-color: #dc3545;
-  --bg-color: #f4f1ed;
-  --card-bg: #ffffff;
-  --text-color: #212529;
-  --text-muted: #8a8a8a;
+  --warning-color: #f59e0b;
+  --info-color: #3b82f6;
+
+  --bg-color: #e0e5ec; /* requirement */
+  --panel-color: #e0e5ec;
+  --card-bg: #e0e5ec;
+
+  --text-color: #1f2937;
+  --text-muted: #6b7280;
+
+  /* Neumorphic shadows */
+  --neu-dark: rgba(163, 177, 198, 0.55);
+  --neu-light: rgba(255, 255, 255, 0.9);
+  --neu-shadow: -8px -8px 16px var(--neu-light), 8px 8px 16px var(--neu-dark);
+  --neu-shadow-inset: inset -8px -8px 16px var(--neu-light), inset 8px 8px 16px var(--neu-dark);
+  --neu-border: rgba(255, 255, 255, 0.35);
+
+  --focus-ring: rgba(203, 153, 126, 0.35);
+
   --sidebar-width: 230px;
   --sidebar-collapsed-width: 0px;
   --navbar-height: 64px;
 }
+
+:root[data-theme="dark"],
+[data-theme="dark"] {
+  --bg-color: #0f172a;
+  --panel-color: #0f172a;
+  --card-bg: #0f172a;
+  --text-color: #e5e7eb;
+  --text-muted: #9ca3af;
+
+  --neu-dark: rgba(0, 0, 0, 0.55);
+  --neu-light: rgba(15, 23, 42, 1);
+  --neu-shadow: -8px -8px 16px var(--neu-light), 8px 8px 16px var(--neu-dark);
+  --neu-shadow-inset: inset -8px -8px 16px var(--neu-light), inset 8px 8px 16px var(--neu-dark);
+  --neu-border: rgba(255, 255, 255, 0.07);
+  --focus-ring: rgba(203, 153, 126, 0.45);
+}
+
 
 * {
   margin: 0;
@@ -27,17 +61,53 @@ body {
   background-color: var(--bg-color);
   color: var(--text-color);
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* ===== SIDEBAR ===== */
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.02em;
+}
+
+p { margin-bottom: 0; }
+
+/* Neumorphism base panels */
+.card,
+.modal-content,
+.toast,
+.form-control,
+.form-select {
+  background: var(--card-bg);
+  color: var(--text-color);
+  border-radius: 0.95rem;
+}
+
+/* Subtle neumorphic border + shadows */
+.card,
+.modal-content,
+.toast {
+  border: 1px solid var(--neu-border);
+  box-shadow: var(--neu-shadow);
+}
+
+.card:hover,
+.modal-content:hover {
+  box-shadow: -10px -10px 18px var(--neu-light), 10px 10px 22px var(--neu-dark);
+}
+
+
+/* ===== SIDEBAR (neumorphism) ===== */
 .sidebar {
   position: fixed;
   left: 0;
   top: 0;
   height: 100vh;
   width: var(--sidebar-width);
-  background: #ffffff;
+  background: var(--bg-color);
   color: var(--text-color);
+  border-right: 1px solid rgba(255,255,255,0.25);
+  box-shadow: var(--neu-shadow);
+
   transition: transform 0.3s cubic-bezier(.4,0,.2,1);
   z-index: 1050;
   display: flex;
@@ -189,15 +259,18 @@ body {
   transform: none;
 }
 
-/* ===== TOP NAVBAR ===== */
+/* ===== TOP NAVBAR (neumorphism) ===== */
 .top-navbar {
   position: fixed;
   top: 0;
   left: var(--sidebar-width);
   right: 0;
   height: var(--navbar-height);
-  background: #ffffff;
-  border-bottom: 1px solid #f0ebe5;
+  background: rgba(224,229,236,0.72);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255,255,255,0.25);
+  box-shadow: var(--neu-shadow);
+
   z-index: 1040;
   transition: left 0.3s cubic-bezier(.4,0,.2,1);
   padding: 0 1.5rem;
@@ -492,57 +565,118 @@ body {
 .stat-number { font-size: 2.5rem; font-weight: bold; color: var(--primary-color); }
 .stat-label { color: var(--secondary-color); font-size: 0.9rem; margin-top: 0.5rem; }
 
-/* ===== TABLES ===== */
+/* ===== TABLES (neumorphism) ===== */
 .table { background: transparent; vertical-align: middle; }
-.table th {
-  background-color: #f8f9fa;
+.table thead th {
+  background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0.25));
   border-top: none;
-  font-weight: 700;
-  color: #495057;
+  font-weight: 800;
+  color: var(--text-muted);
   text-transform: uppercase;
   font-size: 0.75rem;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.08em;
   padding: 1rem 0.75rem;
-  border-bottom: 2px solid #dee2e6;
+  border-bottom: 2px solid rgba(255,255,255,0.35);
 }
-.table td { border-bottom: 1px solid rgba(0,0,0,0.03); }
 
-/* ===== FORMS ===== */
+.table tbody td {
+  border-bottom: 1px solid rgba(255,255,255,0.22);
+  padding: 0.9rem 0.75rem;
+  color: var(--text-color);
+}
+
+.table-hover tbody tr {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.table-hover tbody tr:hover {
+  background: rgba(255,255,255,0.35);
+}
+
+
+/* ===== FORMS (neumorphism) ===== */
 .form-control, .form-select {
-  border-radius: 0.5rem;
-  border: 1px solid #e0dcd7;
-  padding: 0.625rem 0.75rem;
+  border-radius: 0.95rem;
+  border: 1px solid var(--neu-border);
+  padding: 0.675rem 0.85rem;
   font-family: 'Inter', sans-serif;
+  background: var(--card-bg);
+  box-shadow: var(--neu-shadow-inset);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
-.form-control:focus {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 0.2rem rgba(203, 153, 126, 0.2);
+.form-control:hover, .form-select:hover {
+  transform: translateY(-1px);
 }
 
-/* ===== BUTTONS ===== */
+.form-control:focus, .form-select:focus {
+  border-color: rgba(203, 153, 126, 0.6);
+}
+
+
+/* ===== BUTTONS (neumorphism) ===== */
 .btn {
   border-radius: 50rem;
-  padding: 0.5rem 1.25rem;
-  font-weight: 500;
+  padding: 0.55rem 1.25rem;
+  font-weight: 600;
   font-family: 'Inter', sans-serif;
-  transition: all 0.2s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  border: 1px solid rgba(255, 255, 255, 0);
 }
 
-.btn-primary {
-  background-color: var(--primary-color);
-  border-color: var(--primary-color);
-  box-shadow: 0 0.25rem 0.5rem rgba(203, 153, 126, 0.25);
+.btn, 
+.btn:hover {
+  box-shadow: none;
 }
 
-.btn-primary:hover {
-  background-color: var(--primary-dark);
-  border-color: var(--primary-dark);
-  transform: translateY(-1px);
-  box-shadow: 0 0.35rem 0.6rem rgba(203, 153, 126, 0.35);
+/* Keep Bootstrap semantic variants but render them as neumorphic */
+.btn-primary,
+.btn-success,
+.btn-info,
+.btn-warning,
+.btn-danger,
+.btn-secondary {
+  background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.55));
+  border-color: var(--neu-border);
+  color: var(--text-color);
+  box-shadow: var(--neu-shadow-inset);
+}
+
+.btn-primary { color: var(--primary-dark); }
+.btn-success { color: #1f7a39; }
+.btn-info { color: #1d4ed8; }
+.btn-warning { color: #b45309; }
+.btn-danger { color: #b91c1c; }
+
+.btn-outline-primary,
+.btn-outline-danger,
+.btn-outline-success,
+.btn-outline-info {
+  background: transparent;
+  box-shadow: var(--neu-shadow-inset);
+  border-color: var(--neu-border) !important;
+  color: var(--text-color);
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--neu-shadow);
+}
+
+.btn:active {
+  transform: translateY(0);
+  box-shadow: var(--neu-shadow-inset);
+}
+
+.btn:focus,
+.form-control:focus,
+.form-select:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--focus-ring) !important;
 }
 
 /* ===== PARKING ===== */
+
 .parking-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
@@ -620,8 +754,20 @@ body {
 .login-role-copy small { display: block; margin-top: 0.25rem; color: #7b726a; }
 .login-submit-btn { min-height: 3.4rem; }
 
-/* ===== TOASTS ===== */
+/* ===== TOASTS (neumorphism) ===== */
 #app-toast-container { z-index: 4000; }
+
+.toast {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--neu-border) !important;
+  box-shadow: var(--neu-shadow) !important;
+  border-radius: 1rem !important;
+}
+
+.toast-body {
+  color: var(--text-color) !important;
+}
+
 
 /* ===== UTILITIES ===== */
 .text-primary { color: var(--primary-color) !important; }
@@ -651,7 +797,10 @@ body {
     transform: translateX(-100%);
   }
 
-  .sidebar ~ .top-navbar,
+  .sidebar ~ .top-navbar {
+    left: 0 !important;
+  }
+
   .main-content {
     margin-left: 0 !important;
   }
