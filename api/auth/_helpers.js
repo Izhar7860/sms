@@ -1,4 +1,7 @@
-const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY;
+const fs = require('fs');
+const path = require('path');
+
+const FIREBASE_API_KEY = getFrontendFirebaseApiKey() || process.env.FIREBASE_API_KEY;
 const FIREBASE_BASE_URL = 'https://identitytoolkit.googleapis.com/v1/accounts';
 
 const corsHeaders = {
@@ -9,6 +12,16 @@ const corsHeaders = {
 
 function firebaseUrl(action) {
   return `${FIREBASE_BASE_URL}:${action}?key=${FIREBASE_API_KEY}`;
+}
+
+function getFrontendFirebaseApiKey() {
+  try {
+    const configPath = path.join(__dirname, '..', '..', 'public', 'js', 'firebase-config.js');
+    const configSource = fs.readFileSync(configPath, 'utf8');
+    return configSource.match(/apiKey:\s*["']([^"']+)["']/)?.[1] || '';
+  } catch (error) {
+    return '';
+  }
 }
 
 async function callFirebase(action, payload) {

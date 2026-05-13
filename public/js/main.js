@@ -986,11 +986,11 @@ async function createResidentViaSecondaryAuth(resident, password) {
 async function sendResidentPasswordSetupEmail(email) {
   try {
     const resetResponse = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
-      });
-      const resetData = await readApiResponse(resetResponse, 'Resident created, but password setup email could not be sent.');
+    });
+    const resetData = await readApiResponse(resetResponse, 'Resident created, but password setup email could not be sent.');
     if (!resetResponse.ok) {
       const error = new Error(resetData.error || `Resident created, but password setup email could not be sent (HTTP ${resetResponse.status}).`);
       error.status = resetResponse.status;
@@ -1003,6 +1003,9 @@ async function sendResidentPasswordSetupEmail(email) {
     }
 
     console.warn('[admin] reset-password API unavailable, falling back to Firebase client auth', error);
+    if (!auth) {
+      throw new Error('Resident created, but password setup email could not be sent because Firebase Auth is not configured.');
+    }
     await auth.sendPasswordResetEmail(email, { url: getEmailRedirectUrl() });
   }
 }
@@ -1025,7 +1028,9 @@ async function readApiResponse(response, fallbackMessage = 'Request failed') {
   const body = await response.text();
 
   if (!body.trim()) {
-    return {};
+    return response.ok
+      ? {}
+      : { error: `${fallbackMessage} (HTTP ${response.status}).` };
   }
 
   if (contentType.includes('application/json')) {
