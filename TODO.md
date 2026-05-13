@@ -1,7 +1,7 @@
-# TODO
-- [x] Update Add Resident modal UI to include required "Floor Number" input.
-- [x] Update resident creation submit handler to send `floorNumber` to `createResidentProfile`.
-- [ ] Verify `createResidentProfile` persists the new field (it spreads resident object already).
-
-- [ ] Quick smoke test: add resident and confirm `residents/{uid}/floorNumber` in Firebase (or local data fallback).
+- [ ] Inspect current CSS and key page templates (done)
+- [ ] Add neumorphism theme variables (light + dark) and baseline styles
+- [ ] Override cards/buttons/tables/forms/modals/toasts to match neumorphism
+- [ ] Improve spacing/typography/alignment globally for consistency
+- [ ] Add hover/animation effects (subtle, performant)
+- [ ] Run a quick local verification by inspecting pages in browser
 
