@@ -40,11 +40,28 @@
 .marketplace-input, .marketplace-select{
   background: rgba(255,255,255,0.06) !important;
   border: 1px solid rgba(255,255,255,0.14) !important;
-  color: var(--mp-text) !important;
+  color: #000000 !important;
   border-radius: 1rem !important;
 }
 
+/* Ensure select + dropdown options use black font */
+.marketplace-select option{
+  color: #000000 !important;
+}
+
+/***** Common browser dropdown inheritance cases *****/
+.marketplace-select{
+  color-scheme: light !important;
+}
+
+/* Some browsers don't always apply option styling when the dropdown is open */
+select.marketplace-select,
+select.marketplace-select:focus{
+  color: #000000 !important;
+}
+
 .marketplace-input::placeholder{color: rgba(229,231,235,0.55) !important;}
+
 
 .glass-modal{
   background: rgba(10,14,35,0.65) !important;
@@ -54,7 +71,7 @@
 }
 
 .marketplace-table thead th{border-bottom:1px solid rgba(255,255,255,0.15) !important; color: rgba(229,231,235,0.8); background: rgba(255,255,255,0.04);}
-.marketplace-table tbody td{color: var(--mp-text) !important; border-bottom: 1px solid rgba(255,255,255,0.10) !important;}
+.marketplace-table tbody td{color: #000000 !important; border-bottom: 1px solid rgba(255,255,255,0.10) !important;}
 
 .category-cards{
   display:grid;
