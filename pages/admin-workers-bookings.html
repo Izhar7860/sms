@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Worker Bookings - Society Management System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="../public/css/style.css">
+  <link rel="stylesheet" href="../public/css/services-marketplace.css">
+</head>
+<body data-auth-required="true" data-auth-role="admin">
+  <nav class="sidebar collapsed" id="app-sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo-icon"><i class="fas fa-building"></i></div>
+      <h3>Izhar SMS</h3>
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="../index.html" class="nav-link"><i class="fas fa-home nav-icon"></i><span class="nav-text">Home</span></a></li>
+      <li><a href="admin-dashboard.html" class="nav-link"><i class="fas fa-tachometer-alt nav-icon"></i><span class="nav-text">Admin Dashboard</span></a></li>
+      <li><a href="resident-dashboard.html" class="nav-link"><i class="fas fa-user nav-icon"></i><span class="nav-text">Resident Dashboard</span></a></li>
+      <li><a href="parking.html" class="nav-link"><i class="fas fa-car nav-icon"></i><span class="nav-text">Parking</span></a></li>
+      <li><a href="payments.html" class="nav-link"><i class="fas fa-credit-card nav-icon"></i><span class="nav-text">Payments</span></a></li>
+      <li><a href="complaints.html" class="nav-link"><i class="fas fa-exclamation-triangle nav-icon"></i><span class="nav-text">Complaints</span></a></li>
+      <li><a href="notices.html" class="nav-link"><i class="fas fa-bullhorn nav-icon"></i><span class="nav-text">Notices</span></a></li>
+      <li><a href="admin-workers-bookings.html" class="nav-link active" data-marketplace-admin-nav><i class="fas fa-clipboard-check nav-icon"></i><span class="nav-text">Worker Bookings</span></a></li>
+    </ul>
+    <div class="sidebar-login-wrapper">
+      <a href="#" onclick="logout()" class="sidebar-login-btn"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
+    </div>
+    <div class="sidebar-footer">&copy; 2024 Izhar SMS<br>All rights reserved.</div>
+  </nav>
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <nav class="top-navbar">
+    <div class="d-flex align-items-center h-100 w-100">
+      <button id="sidebar-toggle" class="btn btn-link text-dark p-0 me-3"><i class="fas fa-bars fs-5"></i></button>
+      <span class="text-muted small d-none d-md-block"><span data-auth-role-display>Admin</span> Panel</span>
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <div class="dropdown">
+          <a href="#" class="d-flex align-items-center text-dark text-decoration-none dropdown-toggle" data-bs-toggle="dropdown">
+            <span data-auth-email class="small me-2 d-none d-lg-inline">Admin User</span>
+            <div class="user-avatar-circle"><i class="fa-regular fa-user"></i></div>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="#" onclick="logout()">Logout</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="main-content">
+    <div class="container-fluid marketplace-container">
+      <div class="marketplace-hero mb-4">
+        <h1 class="marketplace-title"><i class="fas fa-clipboard-check me-2"></i>Admin: Workers & Bookings</h1>
+        <p class="marketplace-subtitle">Add/Edit/Delete workers, verify them, approve/reject bookings, track history & analytics.</p>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-12 col-lg-5">
+          <section class="glass card border-0">
+            <div class="card-header border-0">
+              <h5 class="mb-0"><i class="fas fa-user-plus me-2"></i>Manage Workers</h5>
+            </div>
+            <div class="card-body">
+              <form id="admin-worker-form" class="admin-form-grid">
+                <div class="mb-3">
+                  <label class="form-label">Name</label>
+                  <input name="name" class="form-control marketplace-input" required />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Phone</label>
+                  <input name="phone" class="form-control marketplace-input" required />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Experience (years)</label>
+                  <input type="number" name="experience" min="0" class="form-control marketplace-input" value="1" />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Category</label>
+                  <select name="category" class="form-select marketplace-select" required></select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Availability</label>
+                  <select name="available" class="form-select marketplace-select">
+                    <option value="true">Available</option>
+                    <option value="false">Not Available</option>
+                  </select>
+                </div>
+
+                <div class="d-flex gap-2 flex-wrap">
+                  <button type="submit" class="btn btn-primary rounded-pill px-4">
+                    <i class="fas fa-plus me-2"></i>Add Worker
+                  </button>
+                </div>
+              </form>
+
+              <hr class="my-4" />
+              <div class="d-flex align-items-center justify-content-between">
+                <h6 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Verification</h6>
+              </div>
+              <div class="small text-muted mt-2">ID proof upload + verify toggle UI is scaffolded. Backend integration can be enabled later.</div>
+
+              <div id="admin-workers-list" class="mt-3 workers-list"></div>
+            </div>
+          </section>
+        </div>
+
+        <div class="col-12 col-lg-7">
+          <section class="glass card border-0">
+            <div class="card-header border-0 d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <h5 class="mb-0"><i class="fas fa-receipt me-2"></i>Approve / Track Bookings</h5>
+              <div class="d-flex gap-2">
+                <select id="admin-booking-status-filter" class="form-select marketplace-select" style="min-width:220px">
+                  <option value="all">All Statuses</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Accepted">Accepted</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Rated">Rated</option>
+                </select>
+              </div>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table align-middle marketplace-table mb-0">
+                  <thead>
+                    <tr>
+                      <th>Resident</th>
+                      <th>Worker</th>
+                      <th>Category</th>
+                      <th>Requested</th>
+                      <th>Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="admin-bookings-table-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section class="glass card border-0 mt-4">
+            <div class="card-header border-0">
+              <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Analytics (Scaffold)</h5>
+            </div>
+            <div class="card-body">
+              <div class="row g-3">
+                <div class="col-6 col-md-3"><div class="stat-mini"><div class="stat-mini-label">Pending</div><div id="analytics-pending" class="stat-mini-value">0</div></div></div>
+                <div class="col-6 col-md-3"><div class="stat-mini"><div class="stat-mini-label">Accepted</div><div id="analytics-accepted" class="stat-mini-value">0</div></div></div>
+                <div class="col-6 col-md-3"><div class="stat-mini"><div class="stat-mini-label">In Progress</div><div id="analytics-inprogress" class="stat-mini-value">0</div></div></div>
+                <div class="col-6 col-md-3"><div class="stat-mini"><div class="stat-mini-label">Completed</div><div id="analytics-completed" class="stat-mini-value">0</div></div></div>
+              </div>
+              <div class="small text-muted mt-2">Hook up to backend analytics endpoint later.</div>
+            </div>
+          </section>
+
+          <section class="glass card border-0 mt-4">
+            <div class="card-header border-0">
+              <h5 class="mb-0"><i class="fas fa-bell me-2"></i>Recent Marketplace Events</h5>
+            </div>
+            <div class="card-body">
+              <div id="marketplace-recent-events" class="recent-events"></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="../public/js/firebase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../public/js/main.js"></script>
+  <script src="../public/js/services-marketplace.js"></script>
+</body>
+</html>
+

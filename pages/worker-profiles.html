@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Worker Profiles - Society Management System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="../public/css/style.css">
+  <link rel="stylesheet" href="../public/css/services-marketplace.css">
+</head>
+<body data-auth-required="true" data-auth-role="resident">
+  <nav class="sidebar collapsed" id="app-sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo-icon"><i class="fas fa-building"></i></div>
+      <h3>Izhar SMS</h3>
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="../index.html" class="nav-link"><i class="fas fa-home nav-icon"></i><span class="nav-text">Home</span></a></li>
+      <li><a href="admin-dashboard.html" class="nav-link"><i class="fas fa-tachometer-alt nav-icon"></i><span class="nav-text">Admin Dashboard</span></a></li>
+      <li><a href="resident-dashboard.html" class="nav-link"><i class="fas fa-user nav-icon"></i><span class="nav-text">Resident Dashboard</span></a></li>
+      <li><a href="parking.html" class="nav-link"><i class="fas fa-car nav-icon"></i><span class="nav-text">Parking</span></a></li>
+      <li><a href="payments.html" class="nav-link"><i class="fas fa-credit-card nav-icon"></i><span class="nav-text">Payments</span></a></li>
+      <li><a href="complaints.html" class="nav-link"><i class="fas fa-exclamation-triangle nav-icon"></i><span class="nav-text">Complaints</span></a></li>
+      <li><a href="notices.html" class="nav-link"><i class="fas fa-bullhorn nav-icon"></i><span class="nav-text">Notices</span></a></li>
+      <li><a href="services-marketplace.html" class="nav-link" data-marketplace-nav><i class="fas fa-hands-helping nav-icon"></i><span class="nav-text">Services Marketplace</span></a></li>
+    </ul>
+    <div class="sidebar-login-wrapper">
+      <a href="#" onclick="logout()" class="sidebar-login-btn"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a>
+    </div>
+    <div class="sidebar-footer">&copy; 2024 Izhar SMS<br>All rights reserved.</div>
+  </nav>
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <nav class="top-navbar">
+    <div class="d-flex align-items-center h-100 w-100">
+      <button id="sidebar-toggle" class="btn btn-link text-dark p-0 me-3"><i class="fas fa-bars fs-5"></i></button>
+      <span class="text-muted small d-none d-md-block"><span data-auth-role-display>Resident</span> Portal</span>
+      <div class="ms-auto d-flex align-items-center gap-3">
+        <div class="dropdown">
+          <a href="#" class="d-flex align-items-center text-dark text-decoration-none dropdown-toggle" data-bs-toggle="dropdown">
+            <span data-auth-email class="small me-2 d-none d-lg-inline">John Doe</span>
+            <div class="user-avatar-circle"><i class="fa-regular fa-user"></i></div>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="#" onclick="logout()">Logout</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="main-content">
+    <div class="container-fluid marketplace-container">
+      <div class="marketplace-hero mb-4">
+        <h1 class="marketplace-title"><i class="fas fa-user-tie me-2"></i>Worker Profiles</h1>
+        <p class="marketplace-subtitle">Explore skills, experience, ratings and verification.</p>
+      </div>
+
+      <section class="marketplace-controls mb-3">
+        <div class="row g-3">
+          <div class="col-12 col-lg-6">
+            <div class="glass card border-0">
+              <div class="card-body">
+                <div class="d-flex align-items-center gap-2">
+                  <i class="fas fa-search text-primary"></i>
+                  <input id="worker-search" class="form-control marketplace-input" placeholder="Search workers..." />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-lg-3">
+            <div class="glass card border-0">
+              <div class="card-body">
+                <select id="worker-category-filter" class="form-select marketplace-select">
+                  <option value="all">All Categories</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-lg-3">
+            <div class="glass card border-0">
+              <div class="card-body">
+                <select id="worker-availability-filter" class="form-select marketplace-select">
+                  <option value="all">Availability: All</option>
+                  <option value="available">Available Now</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="glass card border-0">
+        <div class="card-header border-0">
+          <h5 class="mb-0"><i class="fas fa-id-card me-2"></i>Workers</h5>
+        </div>
+        <div class="card-body">
+          <div id="workers-profiles-grid" class="workers-grid"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Worker Profile Modal (reused by JS) -->
+  <div class="modal fade" id="workerProfileModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content glass-modal border-0">
+        <div class="modal-header border-0">
+          <div class="d-flex align-items-center gap-3">
+            <img id="worker-profile-photo" class="worker-photo" alt="Worker" />
+            <div>
+              <h5 class="mb-0" id="worker-profile-name">Worker Name</h5>
+              <div class="small text-muted" id="worker-profile-category">Category</div>
+            </div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-12 col-lg-6">
+              <div class="glass p-3 h-100">
+                <div class="d-flex flex-wrap gap-2 mb-3" id="worker-skills"></div>
+                <div class="mb-2"><strong>Experience:</strong> <span id="worker-experience">-</span></div>
+                <div class="mb-2"><strong>Phone:</strong> <span id="worker-phone">-</span></div>
+                <div class="mb-2"><strong>Availability:</strong> <span id="worker-availability">-</span></div>
+                <div class="mb-2"><strong>Ratings:</strong> <span id="worker-rating">-</span></div>
+              </div>
+            </div>
+            <div class="col-12 col-lg-6">
+              <div class="glass p-3 h-100">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-shield-alt text-primary"></i>
+                    <strong>Verification</strong>
+                  </div>
+                  <span id="worker-verification-badge" class="badge rounded-pill bg-secondary">Unverified</span>
+                </div>
+                <div class="small text-muted">ID proof upload support is available in Admin panel.</div>
+                <hr class="my-3" />
+                <div class="d-flex align-items-center gap-2">
+                  <button id="book-worker-btn" class="btn btn-primary rounded-pill px-4">
+                    <i class="fas fa-calendar-check me-2"></i>Book this worker
+                  </button>
+                  <button id="call-worker-btn" class="btn btn-outline-primary rounded-pill px-3" type="button">
+                    <i class="fas fa-phone me-2"></i>Call
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <h6 class="mb-2"><i class="fas fa-star text-warning me-2"></i>Reviews</h6>
+            <div id="worker-reviews" class="reviews-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="bookingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content glass-modal border-0">
+        <div class="modal-header border-0">
+          <h5 class="modal-title"><i class="fas fa-clipboard-list me-2 text-primary"></i>Book Service</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="booking-form">
+            <input type="hidden" id="booking-worker-id" />
+            <div class="row g-3">
+              <div class="col-12 col-md-6">
+                <label class="form-label">Service Date & Time</label>
+                <input type="datetime-local" id="booking-datetime" class="form-control marketplace-input" required />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Category</label>
+                <input type="text" id="booking-category" class="form-control marketplace-input" readonly />
+              </div>
+              <div class="col-12">
+                <label class="form-label">Issue Description</label>
+                <textarea id="booking-issue" class="form-control marketplace-input" rows="4" placeholder="Describe the issue..." required></textarea>
+              </div>
+              <div class="col-12">
+                <label class="form-label">Upload Images</label>
+                <input type="file" id="booking-images" class="form-control marketplace-input" accept="image/*" multiple />
+                <div class="small text-muted mt-2">Demo UI only; backend image handling can be integrated later.</div>
+              </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-4">
+              <button type="submit" class="btn btn-primary rounded-pill px-4">
+                <i class="fas fa-paper-plane me-2"></i>Submit Booking Request
+              </button>
+              <a href="bookings.html" class="btn btn-outline-primary rounded-pill px-4">
+                <i class="fas fa-clock me-2"></i>Track Bookings
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="../public/js/firebase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../public/js/main.js"></script>
+  <script src="../public/js/services-marketplace.js"></script>
+</body>
+</html>
+

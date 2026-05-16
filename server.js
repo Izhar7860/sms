@@ -18,7 +18,11 @@ const pageRoutes = {
   'parking.html': path.join(pageDir, 'parking.html'),
   'payments.html': path.join(pageDir, 'payments.html'),
   'complaints.html': path.join(pageDir, 'complaints.html'),
-  'notices.html': path.join(pageDir, 'notices.html')
+  'notices.html': path.join(pageDir, 'notices.html'),
+  'services-marketplace.html': path.join(pageDir, 'services-marketplace.html'),
+  'worker-profiles.html': path.join(pageDir, 'worker-profiles.html'),
+  'bookings.html': path.join(pageDir, 'bookings.html'),
+  'admin-workers-bookings.html': path.join(pageDir, 'admin-workers-bookings.html')
 };
 
 function sendPage(res, pageName) {
@@ -37,6 +41,10 @@ app.use(express.static(publicDir));
 app.use(express.static(rootDir));
 
 app.use('/api/auth', require('./backend/auth'));
+
+app.use('/api/marketplace', require('./api/services-marketplace/routes'));
+app.use('/api/marketplace', require('./api/services-marketplace/app').errorHandler);
+
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
@@ -82,6 +90,22 @@ app.get(['/complaints', '/complaints.html', '/pages/complaints', '/pages/complai
 
 app.get(['/notices', '/notices.html', '/pages/notices', '/pages/notices.html'], (req, res) => {
   sendPage(res, 'notices.html');
+});
+
+app.get(['/services', '/services-marketplace', '/services-marketplace.html', '/pages/services-marketplace', '/pages/services-marketplace.html'], (req, res) => {
+  sendPage(res, 'services-marketplace.html');
+});
+
+app.get(['/workers', '/worker-profiles', '/worker-profiles.html', '/pages/worker-profiles', '/pages/worker-profiles.html'], (req, res) => {
+  sendPage(res, 'worker-profiles.html');
+});
+
+app.get(['/bookings', '/bookings.html', '/pages/bookings', '/pages/bookings.html'], (req, res) => {
+  sendPage(res, 'bookings.html');
+});
+
+app.get(['/admin-workers-bookings', '/admin-workers-bookings.html', '/pages/admin-workers-bookings', '/pages/admin-workers-bookings.html'], (req, res) => {
+  sendPage(res, 'admin-workers-bookings.html');
 });
 
 app.get('/pages/:page', (req, res, next) => {
