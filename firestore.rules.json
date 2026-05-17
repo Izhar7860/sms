@@ -1,0 +1,25 @@
+{
+  "rules_version": "2",
+  "service": "cloud.firestore",
+  "match": {
+    "/databases/{database}/documents": {
+      "workers": {
+        ".read": "true",
+        ".write": "false"
+      },
+      "reviews": {
+        ".read": "true",
+        ".write": "request.auth != null"
+      },
+      "workerBookings": {
+        ".read": "request.auth != null && (resource.data.residentId == request.auth.uid || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')",
+        ".write": "request.auth != null && (request.resource.data.residentId == request.auth.uid || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')"
+      },
+      "residents": {
+        ".read": "request.auth != null && (resource.id == request.auth.uid || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')",
+        ".write": "request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'"
+      }
+    }
+  }
+}
+

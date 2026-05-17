@@ -174,12 +174,18 @@ function initSidebar() {
 }
 
 function setActiveNavLink() {
-  const currentPage = pathname.split('/').pop() || 'index.html';
+  const normalizePage = (value) => String(value || '')
+    .replace(/^\.\/|^\.\.\//, '')
+    .replace(/^\//, '')
+    .replace(/\.html$/, '')
+    .toLowerCase();
+
+  const currentPage = normalizePage(pathname.split('/').pop()) || 'index';
   const navLinks = document.querySelectorAll('.nav-link');
 
   navLinks.forEach((link) => {
-    const href = link.getAttribute('href');
-    if (href === currentPage || href === `pages/${currentPage}` || href === `../${currentPage}`) {
+    const href = normalizePage(link.getAttribute('href'));
+    if (href === currentPage) {
       link.classList.add('active');
     }
   });
@@ -593,19 +599,66 @@ function renderNotices() {
   const noticesContainer = document.getElementById('notices-container');
   if (noticesContainer) {
     noticesContainer.innerHTML = '';
-    window.SMSData.notices.forEach((notice) => {
+    const isAdmin = getUserRole(auth?.currentUser) === 'admin';
+
+    const nowTs = Date.now();
+    const activeNotices = (window.SMSData.notices || []).filter((n) => {
+      if (!n) return false;
+      if (!n.expiresAt) return true;
+      const exp = new Date(n.expiresAt).getTime();
+      return Number.isFinite(exp) ? exp > nowTs : true;
+    });
+
+    window.SMSData.notices = activeNotices;
+
+    window.SMSData.notices.forEach((notice, index) => {
+      const firebaseKey = notice?.firebaseKey || notice?.key || notice?.id; // id may be a numeric seed; delete only works reliably with push keys
+
       const noticeCard = document.createElement('div');
       noticeCard.className = 'p-4 border-bottom';
+
       noticeCard.innerHTML = `
-        <div class="d-flex justify-content-between align-items-start mb-2">
+        <div class="d-flex justify-content-between align-items-start mb-2 gap-3">
           <h6 class="mb-1">${escapeHtml(notice.title)}</h6>
-          <span class="badge bg-primary">${formatDate(notice.date)}</span>
+          <div class="d-flex flex-column align-items-end">
+            <span class="badge bg-primary">${formatDate(notice.date)}</span>
+            ${isAdmin ? `
+              <button
+                class="btn btn-sm btn-outline-danger rounded-pill mt-2"
+                type="button"
+                data-notice-delete
+                data-notice-key="${escapeHtml(String(firebaseKey ?? '').trim())}"
+                data-notice-index="${index}"
+                ${firebaseKey ? '' : 'disabled'}
+                title="${firebaseKey ? 'Delete notice' : 'Delete not available for this notice item (missing Firebase key)'}"
+              >
+                <i class="fas fa-trash me-1"></i>Delete
+              </button>
+            ` : ''}
+          </div>
         </div>
         <p class="mb-2 text-muted">${escapeHtml(notice.content)}</p>
         <small class="text-muted d-block">${escapeHtml(notice.target || 'All Residents')}</small>
       `;
+
       noticesContainer.appendChild(noticeCard);
     });
+
+    if (isAdmin && noticesContainer.dataset.bound !== 'true') {
+      noticesContainer.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-notice-delete]');
+        if (!btn) return;
+
+        const key = btn.dataset.noticeKey;
+        if (!key) {
+          showToast('Cannot delete: Firebase key missing for this notice.', 'warning');
+          return;
+        }
+
+        window.deleteNotice(key);
+      });
+      noticesContainer.dataset.bound = 'true';
+    }
   }
 }
 
@@ -1110,12 +1163,19 @@ function initNoticeForm() {
 
     try {
       const formData = new FormData(noticeForm);
+      const rawExpiresAt = formData.get('expiresAt')?.toString();
+
+      // datetime-local comes as local time; convert to ISO safely.
+      const expiresAt = rawExpiresAt ? new Date(rawExpiresAt).toISOString() : null;
+
       const notice = {
         title: formData.get('title')?.toString().trim() || 'Notice',
         content: formData.get('content')?.toString().trim() || '',
         target: formData.get('target')?.toString().trim() || 'All Residents',
         author: auth?.currentUser?.email || 'Admin',
-        date: new Date().toISOString()
+        date: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        expiresAt // nullable (no auto-expire)
       };
 
       await addCollectionItem('notices', notice);
@@ -1154,6 +1214,42 @@ async function saveComplaint(complaint) {
     throw new Error('Unable to save complaint to Firebase.');
   }
 }
+
+window.deleteNotice = async function (noticeKey) {
+  if (!noticeKey) return;
+  if (!confirm('Delete this notice?')) return;
+
+  // Firebase keys are required for reliable deletion
+  if (!database) {
+    // Best-effort local removal for static/demo mode
+    window.SMSData.notices = (window.SMSData.notices || []).filter((n) => {
+      const key = n?.firebaseKey || n?.key || n?.id;
+      return String(key) !== String(noticeKey);
+    });
+    renderAppData();
+    showToast('Notice deleted locally (Firebase unavailable).', 'warning');
+    return;
+  }
+
+  try {
+    await database.ref(`notices/${noticeKey}`).remove();
+    showToast('Notice deleted.', 'success');
+  } catch (error) {
+    if (isPermissionDeniedError(error)) {
+      // Local fallback (best effort)
+      window.SMSData.notices = (window.SMSData.notices || []).filter((n) => {
+        const key = n?.firebaseKey || n?.key || n?.id;
+        return String(key) !== String(noticeKey);
+      });
+      renderAppData();
+      showToast('Deleted locally. Firebase rules are still blocking database writes.', 'warning');
+      return;
+    }
+
+    showToast(error.message || 'Failed to delete notice.', 'danger');
+  }
+};
+
 
 function saveLocalComplaint(complaint) {
   const localComplaint = {

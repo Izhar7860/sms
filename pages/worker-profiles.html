@@ -14,6 +14,7 @@
     <div class="sidebar-header">
       <div class="sidebar-logo-icon"><i class="fas fa-building"></i></div>
       <h3>Izhar SMS</h3>
+      
     </div>
     <ul class="sidebar-nav">
       <li><a href="../index.html" class="nav-link"><i class="fas fa-home nav-icon"></i><span class="nav-text">Home</span></a></li>
@@ -51,12 +52,12 @@
     </div>
   </nav>
 
-  <main class="main-content">
+  <main class="main-content" aria-labelledby="worker-profiles-title">
     <div class="container-fluid marketplace-container">
       <div class="marketplace-hero mb-4">
         <div class="d-flex flex-wrap align-items-center gap-3">
           <div>
-            <h1 class="marketplace-title"><i class="fas fa-user-tie me-2"></i>Worker Profiles</h1>
+            <h1 class="marketplace-title" id="worker-profiles-title"><i class="fas fa-user-tie me-2"></i>Worker Profiles</h1>
             <p class="marketplace-subtitle">Explore skills, experience, ratings and verification.</p>
           </div>
           <a href="services-marketplace.html" class="btn btn-outline-primary rounded-pill px-4">
@@ -65,14 +66,15 @@
         </div>
       </div>
 
-      <section class="marketplace-controls mb-3">
+      <section class="marketplace-controls mb-3" aria-label="Worker search and filters">
         <div class="row g-3">
           <div class="col-12 col-lg-6">
             <div class="glass card border-0">
               <div class="card-body">
                 <div class="d-flex align-items-center gap-2">
-                  <i class="fas fa-search text-primary"></i>
-                  <input id="worker-search" class="form-control marketplace-input" placeholder="Search workers..." />
+                  <i class="fas fa-search text-primary" aria-hidden="true"></i>
+                  <label for="worker-search" class="visually-hidden">Search workers</label>
+                  <input id="worker-search" class="form-control marketplace-input" placeholder="Search workers..." inputmode="search" autocomplete="off" />
                 </div>
               </div>
             </div>
@@ -80,7 +82,8 @@
           <div class="col-12 col-lg-3">
             <div class="glass card border-0">
               <div class="card-body">
-                <select id="worker-category-filter" class="form-select marketplace-select">
+                <label for="worker-category-filter" class="visually-hidden">Filter by category</label>
+                <select id="worker-category-filter" class="form-select marketplace-select" aria-label="Filter by category">
                   <option value="all">All Categories</option>
                 </select>
               </div>
@@ -89,7 +92,8 @@
           <div class="col-12 col-lg-3">
             <div class="glass card border-0">
               <div class="card-body">
-                <select id="worker-availability-filter" class="form-select marketplace-select">
+                <label for="worker-availability-filter" class="visually-hidden">Filter by availability</label>
+                <select id="worker-availability-filter" class="form-select marketplace-select" aria-label="Filter by availability">
                   <option value="all">Availability: All</option>
                   <option value="available">Available Now</option>
                 </select>
@@ -104,7 +108,16 @@
           <h5 class="mb-0"><i class="fas fa-id-card me-2"></i>Workers</h5>
         </div>
         <div class="card-body">
-          <div id="workers-profiles-grid" class="workers-grid"></div>
+          <!-- Loading placeholder (keeps layout stable while workers are fetched) -->
+          <div id="workers-loading" class="text-muted small mb-3" role="status" aria-live="polite">
+            Loading workers...
+          </div>
+          <!-- Actual grid rendered by public/js/services-marketplace.js -->
+          <div id="workers-profiles-grid" class="workers-grid" aria-busy="true" aria-live="polite"></div>
+          <!-- Empty state will be shown by JS if no workers match -->
+          <div id="workers-empty" class="empty-state d-none" aria-hidden="true">
+            No workers match your filters.
+          </div>
         </div>
       </div>
     </div>
@@ -116,7 +129,7 @@
       <div class="modal-content glass-modal border-0">
         <div class="modal-header border-0">
           <div class="d-flex align-items-center gap-3">
-            <img id="worker-profile-photo" class="worker-photo" alt="Worker" />
+            <img id="worker-profile-photo" class="worker-photo" alt="Worker profile" loading="lazy" referrerpolicy="no-referrer" />
             <div>
               <h5 class="mb-0" id="worker-profile-name">Worker Name</h5>
               <div class="small text-muted" id="worker-profile-category">Category</div>
@@ -175,8 +188,8 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <form id="booking-form">
-            <input type="hidden" id="booking-worker-id" />
+          <form id="booking-form" aria-label="Booking form">
+            <input type="hidden" id="booking-worker-id" aria-hidden="true" />
             <div class="row g-3">
               <div class="col-12 col-md-6">
                 <label class="form-label">Service Date & Time</label>
@@ -197,13 +210,14 @@
               </div>
             </div>
             <div class="d-flex flex-wrap gap-2 mt-4">
-              <button type="submit" class="btn btn-primary rounded-pill px-4">
-                <i class="fas fa-paper-plane me-2"></i>Submit Booking Request
+              <button type="submit" class="btn btn-primary rounded-pill px-4" id="booking-submit-btn">
+                <i class="fas fa-paper-plane me-2" aria-hidden="true"></i>Submit Booking Request
               </button>
-              <a href="bookings.html" class="btn btn-outline-primary rounded-pill px-4">
-                <i class="fas fa-clock me-2"></i>Track Bookings
+              <a href="bookings.html" class="btn btn-outline-primary rounded-pill px-4" aria-label="Track bookings">
+                <i class="fas fa-clock me-2" aria-hidden="true"></i>Track Bookings
               </a>
             </div>
+            <div class="small text-muted mt-2" id="booking-form-status" role="status" aria-live="polite"></div>
           </form>
         </div>
       </div>
@@ -213,10 +227,39 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="../public/js/firebase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script src="../public/js/main.js"></script>
   <script src="../public/js/services-marketplace.js"></script>
+
+  <!-- Page-local auth check to prevent flicker on Worker Profiles page -->
+  <script>
+    (function () {
+      // main.js already enforces auth via applyAuthGuard().
+      // This block only adds extra safety for this page (prevents blank/unauthorized UI flashes).
+      const body = document.body;
+      if (!body || body.dataset.authRequired !== 'true') return;
+
+      const role = body.dataset.authRole || 'resident';
+
+      window.addEventListener('load', function () {
+        try {
+          const storedRole = sessionStorage.getItem('user_role');
+          if (!storedRole) {
+            window.location.href = 'login.html';
+            return;
+          }
+
+          // If role doesn't match, main.js will redirect. We keep this as a no-op to avoid double redirects.
+          if (storedRole.toLowerCase() === role.toLowerCase()) return;
+        } catch (e) {
+          // If anything fails, do nothing (main.js auth guard will handle).
+        }
+      }, { once: true });
+    })();
+  </script>
 </body>
 </html>
+
 

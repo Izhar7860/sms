@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Minimal Tailwind entry.
+  The repo currently uses Bootstrap and custom CSS; this file enables Tailwind-based UI for the React portal.
+*/
+

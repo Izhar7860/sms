@@ -424,35 +424,144 @@
     bootstrap.Modal.getOrCreateInstance($('#bookingModal')).show();
   }
 
+  // ------------------------------
+  // Firestore (best-effort)
+  // ------------------------------
+  let firestore = null;
+  let firestoreReady = false;
+
+  function safeGetAuthUid() {
+    try {
+      // main.js stores user_role/email in sessionStorage; UID is used only for Firestore booking.
+      // If auth is available, use it; otherwise fallback to empty.
+      if (window.firebase?.auth?.currentUser?.uid) return window.firebase.auth().currentUser.uid;
+      // Some deployments might expose auth UID directly on session.
+      return sessionStorage.getItem('user_uid') || '';
+    } catch {
+      return '';
+    }
+  }
+
+  function safeInitFirestore() {
+    if (firestoreReady) return;
+    firestoreReady = true;
+
+    try {
+      if (!window.firebase || !window.firebase.firestore) return;
+      // firebase-config.js initializes window.firebase and app in most pages.
+      firestore = window.firebase.firestore();
+    } catch (e) {
+      firestore = null;
+    }
+  }
+
+  async function bestEffortWriteWorkerBookingToFirestore(booking) {
+    // booking should already be normalized to our UI shape.
+    safeInitFirestore();
+    if (!firestore) return { ok: false, reason: 'firestore_unavailable' };
+
+    const residentId = safeGetAuthUid();
+    if (!residentId) {
+      // Keep booking flow intact even if UID is not available.
+      return { ok: false, reason: 'missing_uid' };
+    }
+
+    const bookingDoc = {
+      residentId,
+      workerId: booking.workerId || booking.worker_id || '',
+      workerName: booking.workerName || '',
+      category: booking.category || '',
+      issue: booking.issue || '',
+      requestedAt: booking.requestedAt ? new Date(booking.requestedAt).toISOString() : new Date().toISOString(),
+      bookingStatus: booking.status || 'Pending',
+      emergency: Boolean(booking.emergency),
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      // Use auto-id to avoid overwriting.
+      await firestore.collection('workerBookings').add(bookingDoc);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: e?.message || 'firestore_write_failed' };
+    }
+  }
+
   async function createBooking(payload, emergency = false) {
+    const requestedIso = payload?.requested_at || new Date().toISOString();
+    const workerId = payload?.worker_id;
+
+    // Normalize locally first so UI + listeners can proceed immediately.
+    const worker = state.workers.find((item) => item.id === workerId);
+    const pendingBooking = normalizeBooking({
+      id: `b_${Date.now()}`,
+      ...payload,
+      workerId,
+      workerName: worker?.name,
+      category_name: payload.category_name,
+      booking_status: 'Pending',
+      requested_at: requestedIso,
+      resident_user_id: payload.resident_user_id,
+      requested_at_iso: requestedIso,
+      emergency
+    });
+
+    // Keep existing API flow as the source of truth for current functionality.
+    let finalBooking = pendingBooking;
+
     if (state.apiAvailable) {
       try {
         const saved = await apiFetch(emergency ? '/bookings/emergency' : '/bookings', {
           method: 'POST',
           body: JSON.stringify(payload)
         });
-        const booking = normalizeBooking(saved);
-        state.bookings = [booking, ...state.bookings.filter((item) => item.id !== booking.id)];
+        finalBooking = normalizeBooking(saved);
+        state.bookings = [finalBooking, ...state.bookings.filter((item) => item.id !== finalBooking.id)];
         setJson(BOOKING_STORE_KEY, state.bookings);
-        return booking;
       } catch (error) {
         state.apiAvailable = false;
         toast(`${error.message}. Saving locally for now.`, 'warning');
+
+        // Local fallback (preserve existing behavior)
+        finalBooking = pendingBooking;
+        state.bookings = [finalBooking, ...state.bookings.filter((item) => item.id !== finalBooking.id)];
+        setJson(BOOKING_STORE_KEY, state.bookings);
       }
+    } else {
+      // Local fallback
+      state.bookings = [finalBooking, ...state.bookings.filter((item) => item.id !== finalBooking.id)];
+      setJson(BOOKING_STORE_KEY, state.bookings);
     }
 
-    const worker = state.workers.find((item) => item.id === payload.worker_id);
-    const localBooking = normalizeBooking({
-      id: `b_${Date.now()}`,
-      ...payload,
-      workerName: worker?.name,
-      category_name: payload.category_name,
-      booking_status: 'Pending',
-      emergency
-    });
-    state.bookings = [localBooking, ...state.bookings];
-    setJson(BOOKING_STORE_KEY, state.bookings);
-    return localBooking;
+    // Best-effort Firestore write (does NOT block existing booking behavior)
+    try {
+      // Map UI bookingStatus requirement
+      const statusMap = {
+        Pending: 'Pending',
+        Accepted: 'Accepted',
+        'In Progress': 'Accepted',
+        Completed: 'Completed',
+        Cancelled: 'Cancelled',
+        Rated: 'Completed'
+      };
+
+      const bookingForFirestore = {
+        ...finalBooking,
+        status: statusMap[finalBooking.status] || finalBooking.status || 'Pending',
+        bookingStatus: statusMap[finalBooking.status] || finalBooking.status || 'Pending'
+      };
+
+      const res = await bestEffortWriteWorkerBookingToFirestore(bookingForFirestore);
+      if (!res.ok) {
+        // Only warn silently; do not break UX.
+        console.warn('[firestore] booking write skipped:', res.reason);
+      }
+    } catch (e) {
+      // Ignore firestore errors.
+      console.warn('[firestore] booking write failed', e);
+    }
+
+    return finalBooking;
   }
 
   function wireBookingForm() {
