@@ -2,7 +2,7 @@
 (function () {
   const pathname = window.location.pathname;
   const isServices = pathname.includes('services-marketplace') || pathname.endsWith('/services');
-  const isWorkers = pathname.includes('worker-profiles') || pathname.endsWith('/workers');
+  const isWorkers = pathname.includes('worker-profiles') || pathname.endsWith('/workers') || document.getElementById('workers-profiles-grid');
   const isBookings = pathname.includes('bookings') && !pathname.includes('admin-workers-bookings');
   const isAdmin = pathname.includes('admin-workers-bookings');
 
@@ -573,6 +573,9 @@
             <button class="btn btn-sm btn-outline-success rounded-pill" data-admin-toggle="${escapeAttr(worker.id)}">
               <i class="fas fa-toggle-on me-1"></i>${worker.available ? 'Set Unavailable' : 'Set Available'}
             </button>
+            <button class="btn btn-sm btn-outline-danger rounded-pill" data-admin-delete="${escapeAttr(worker.id)}">
+              <i class="fas fa-trash me-1"></i>Delete
+            </button>
           </div>
         </div>
       `).join('');
@@ -582,6 +585,9 @@
       });
       $$('[data-admin-toggle]', list).forEach((button) => {
         button.addEventListener('click', () => toggleWorkerAvailability(button.dataset.adminToggle));
+      });
+      $$('[data-admin-delete]', list).forEach((button) => {
+        button.addEventListener('click', () => deleteAdminWorker(button.dataset.adminDelete));
       });
     }
 
@@ -659,6 +665,36 @@
     renderMarketplace();
   }
 
+  async function deleteAdminWorker(id) {
+    const worker = state.workers.find((item) => item.id === id);
+    if (!worker) return;
+
+    const ok = window.confirm(`Delete worker "${worker.name}"? This cannot be undone.`);
+    if (!ok) return;
+
+    if (state.apiAvailable) {
+      try {
+        await apiFetch(`/admin/workers/${id}`, {
+          method: 'DELETE'
+        });
+      } catch (error) {
+        state.apiAvailable = false;
+        toast(`${error.message}. Deleting locally for now.`, 'warning');
+      }
+    }
+
+    state.workers = state.workers.filter((w) => w.id !== id);
+    setJson(WORKER_STORE_KEY, state.workers);
+
+    // Bookings for deleted workers may still exist locally; just refresh UI.
+    rememberEvent(`Worker deleted: ${worker.name}`);
+    toast('Worker deleted.', 'success');
+
+    renderAdminWorkers();
+    renderMarketplace();
+    renderAdminBookings();
+  }
+
   async function toggleWorkerAvailability(id) {
     const worker = state.workers.find((item) => item.id === id);
     if (!worker) return;
@@ -671,6 +707,7 @@
     renderAdminWorkers();
     renderMarketplace();
   }
+
 
   function renderAdminBookings() {
     if (!isAdmin) return;
@@ -818,7 +855,12 @@
     if (isBookings || isAdmin) await loadBookings(isAdmin);
     if (!state.bookings.length && (isBookings || isAdmin)) await loadBookings(false);
 
-    renderMarketplace();
+    // Ensure marketplace renders on both services-marketplace.html and worker-profiles.html
+    // (renderMarketplace() is shared; only some sections are conditional internally)
+    if (isServices || isWorkers || document.getElementById('workers-profiles-grid') || document.getElementById('workers-grid')) {
+      renderMarketplace();
+    }
+
     renderBookingsPage();
     renderAdminWorkers();
     renderAdminBookings();
