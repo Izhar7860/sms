@@ -191,19 +191,40 @@ function setActiveNavLink() {
   });
 }
 
+async function getSocietyIdForCurrentUser() {
+  try {
+    const uid = auth?.currentUser?.uid;
+    if (!uid || !database) return 'default_society';
+
+    const snap = await database.ref(`users/${uid}/societyId`).once('value');
+    const societyId = snap?.val();
+    return societyId || 'default_society';
+  } catch (e) {
+    return 'default_society';
+  }
+}
+
 async function hydrateAppData() {
   renderAppData();
   if (!database) return;
 
+  // Cache societyId for this browser session
+  if (!window.__SMS_SOCID__) {
+    window.__SMS_SOCID__ = await getSocietyIdForCurrentUser();
+  }
+  const societyId = window.__SMS_SOCID__ || 'default_society';
+
+  const societyRef = (collectionName) => `societies/${societyId}/${collectionName}`;
+
   try {
     const collections = getPageDataCollections();
 
-    if (collections.has('stats')) attachRealtimeCollection('stats', defaultSMSData.stats, (value) => {
+    if (collections.has('stats')) attachRealtimeCollection(societyRef('stats'), defaultSMSData.stats, (value) => {
       window.SMSData.stats = { ...defaultSMSData.stats, ...(value || {}) };
       renderAppData();
     });
 
-    if (collections.has('residents')) attachRealtimeCollection('residents', defaultSMSData.residents, (value, rawValue) => {
+    if (collections.has('residents')) attachRealtimeCollection(societyRef('residents'), defaultSMSData.residents, (value, rawValue) => {
       window.SMSData.residents = normalizeCollection(value, defaultSMSData.residents);
       if (rawValue) {
         window.SMSData.stats.totalResidents = window.SMSData.residents.length;
@@ -211,7 +232,7 @@ async function hydrateAppData() {
       renderAppData();
     });
 
-    if (collections.has('payments')) attachRealtimeCollection('payments', defaultSMSData.payments, (value, rawValue) => {
+    if (collections.has('payments')) attachRealtimeCollection(societyRef('payments'), defaultSMSData.payments, (value, rawValue) => {
       window.SMSData.payments = normalizeCollection(value, defaultSMSData.payments);
       if (rawValue) {
         window.SMSData.stats.pendingPayments = countPendingPayments(window.SMSData.payments);
@@ -219,21 +240,21 @@ async function hydrateAppData() {
       renderAppData();
     });
 
-    if (collections.has('complaints')) attachRealtimeCollection('complaints', defaultSMSData.complaints, (value) => {
+    if (collections.has('complaints')) attachRealtimeCollection(societyRef('complaints'), defaultSMSData.complaints, (value) => {
       window.SMSData.complaints = normalizeCollection(value, defaultSMSData.complaints);
       window.SMSData.stats.complaints = window.SMSData.complaints.length;
       notifyOnNewItems('complaint');
       renderAppData();
     });
 
-    if (collections.has('notices')) attachRealtimeCollection('notices', defaultSMSData.notices, (value) => {
+    if (collections.has('notices')) attachRealtimeCollection(societyRef('notices'), defaultSMSData.notices, (value) => {
       window.SMSData.notices = normalizeCollection(value, defaultSMSData.notices);
       notifyOnNewItems('notice');
       renderAppData();
     });
 
 
-    if (collections.has('parkingSlots')) attachRealtimeCollection('parkingSlots', defaultSMSData.parkingSlots, (value, rawValue, error) => {
+    if (collections.has('parkingSlots')) attachRealtimeCollection(societyRef('parkingSlots'), defaultSMSData.parkingSlots, (value, rawValue, error) => {
       window.SMSData.parkingSlots = rawValue
         ? normalizeCollection(value, defaultSMSData.parkingSlots)
         : [...defaultSMSData.parkingSlots];
@@ -243,12 +264,12 @@ async function hydrateAppData() {
       renderAppData();
     });
 
-    if (collections.has('parkingAllocations')) attachRealtimeCollection('parkingAllocations', defaultSMSData.parkingAllocations, (value) => {
+    if (collections.has('parkingAllocations')) attachRealtimeCollection(societyRef('parkingAllocations'), defaultSMSData.parkingAllocations, (value) => {
       window.SMSData.parkingAllocations = normalizeCollection(value, defaultSMSData.parkingAllocations);
       renderAppData();
     });
 
-    if (collections.has('visitorParking')) attachRealtimeCollection('visitorParking', defaultSMSData.visitorParking, (value) => {
+    if (collections.has('visitorParking')) attachRealtimeCollection(societyRef('visitorParking'), defaultSMSData.visitorParking, (value) => {
       window.SMSData.visitorParking = normalizeCollection(value, defaultSMSData.visitorParking);
       renderAppData();
     });
@@ -786,7 +807,8 @@ function showComplaintDetails(id) {
 async function updateComplaintStatus(id, status) {
   ensureDatabaseAvailable('update complaint status');
   try {
-    await database.ref(`complaints/${id}`).update({ status });
+    const societyId = window.__SMS_SOCID__ || 'default_society';
+    await database.ref(`societies/${societyId}/complaints/${id}`).update({ status });
     // Local update will happen via realtime listener
   } catch (error) {
     console.error('Failed to update complaint status', error);
@@ -1204,8 +1226,10 @@ async function saveComplaint(complaint) {
     return saveLocalComplaint(complaint);
   }
 
+  const societyId = window.__SMS_SOCID__ || 'default_society';
+
   try {
-    return await database.ref('complaints').push(complaint);
+    return await database.ref(`societies/${societyId}/complaints`).push(complaint);
   } catch (error) {
     console.error('[database] failed to write complaints', error);
     if (isPermissionDeniedError(error)) {
@@ -1232,7 +1256,8 @@ window.deleteNotice = async function (noticeKey) {
   }
 
   try {
-    await database.ref(`notices/${noticeKey}`).remove();
+    const societyId = window.__SMS_SOCID__ || 'default_society';
+    await database.ref(`societies/${societyId}/notices/${noticeKey}`).remove();
     showToast('Notice deleted.', 'success');
   } catch (error) {
     if (isPermissionDeniedError(error)) {
@@ -1307,10 +1332,12 @@ async function seedDefaultParkingSlots() {
   if (parkingSlotsSeeded || !database) return;
   parkingSlotsSeeded = true;
 
+  const societyId = window.__SMS_SOCID__ || 'default_society';
+
   const updates = {};
   defaultSMSData.parkingSlots.forEach((slot) => {
     const key = `slot${slot.id || slot.slot?.replace(/\D/g, '')}`;
-    updates[`parkingSlots/${key}`] = {
+    updates[`societies/${societyId}/parkingSlots/${key}`] = {
       slot: slot.slot,
       location: slot.location || '',
       status: slot.status || 'available'
@@ -1338,7 +1365,8 @@ async function saveParkingSlot(parkingSlot) {
       throw new Error(`${parkingSlot.slot} already exists.`);
     }
 
-    const slotRef = database.ref('parkingSlots').push();
+    const societyId = window.__SMS_SOCID__ || 'default_society';
+    const slotRef = database.ref(`societies/${societyId}/parkingSlots`).push();
     const slotRecord = {
       slot: parkingSlot.slot,
       location: parkingSlot.location || '',
@@ -1346,7 +1374,7 @@ async function saveParkingSlot(parkingSlot) {
     };
 
     await database.ref().update({
-      [`parkingSlots/${slotRef.key}`]: slotRecord
+      [`societies/${societyId}/parkingSlots/${slotRef.key}`]: slotRecord
     });
 
     return slotRef;
@@ -1363,7 +1391,8 @@ async function saveParkingAllocation(allocation) {
   ensureDatabaseAvailable('save parking allocation');
 
   try {
-    const allocationRef = database.ref('parkingAllocations').push();
+    const societyId = window.__SMS_SOCID__ || 'default_society';
+    const allocationRef = database.ref(`societies/${societyId}/parkingAllocations`).push();
     const allocationRecord = {
       ...allocation,
       createdAt: new Date().toISOString(),
@@ -1371,8 +1400,8 @@ async function saveParkingAllocation(allocation) {
     };
     const parkingSlot = await findParkingSlotRecord(allocation.slot);
     const slotRef = parkingSlot?.key
-      ? database.ref(`parkingSlots/${parkingSlot.key}`)
-      : database.ref('parkingSlots').push();
+      ? database.ref(`societies/${societyId}/parkingSlots/${parkingSlot.key}`)
+      : database.ref(`societies/${societyId}/parkingSlots`).push();
 
     const slotRecord = {
       ...(parkingSlot?.value || {}),
@@ -1383,8 +1412,8 @@ async function saveParkingAllocation(allocation) {
     };
 
     await database.ref().update({
-      [`parkingAllocations/${allocationRef.key}`]: allocationRecord,
-      [`parkingSlots/${slotRef.key}`]: slotRecord
+      [`societies/${societyId}/parkingAllocations/${allocationRef.key}`]: allocationRecord,
+      [`societies/${societyId}/parkingSlots/${slotRef.key}`]: slotRecord
     });
 
     return allocationRef;
@@ -1398,8 +1427,10 @@ async function saveParkingAllocation(allocation) {
 }
 
 async function findParkingSlotRecord(slotName) {
+  const societyId = window.__SMS_SOCID__ || 'default_society';
+
   const snapshot = await database
-    .ref('parkingSlots')
+    .ref(`societies/${societyId}/parkingSlots`)
     .orderByChild('slot')
     .equalTo(slotName)
     .limitToFirst(1)
@@ -2046,15 +2077,17 @@ window.deleteAllocation = async function(allocationId) {
 
     ensureDatabaseAvailable('delete parking allocation');
     const allocation = window.SMSData.parkingAllocations.find((item) => item.id === allocationId);
+    const societyId = window.__SMS_SOCID__ || 'default_society';
+
     const updates = {
-      [`parkingAllocations/${allocationId}`]: null
+      [`societies/${societyId}/parkingAllocations/${allocationId}`]: null
     };
 
     if (allocation?.slot) {
       const parkingSlot = await findParkingSlotRecord(allocation.slot);
       if (parkingSlot?.key) {
-        updates[`parkingSlots/${parkingSlot.key}/status`] = 'available';
-        updates[`parkingSlots/${parkingSlot.key}/allocationId`] = null;
+        updates[`societies/${societyId}/parkingSlots/${parkingSlot.key}/status`] = 'available';
+        updates[`societies/${societyId}/parkingSlots/${parkingSlot.key}/allocationId`] = null;
       }
     }
 
@@ -2262,7 +2295,8 @@ async function saveVisitorParkingEntry(entry) {
   try {
     ensureDatabaseAvailable('save visitor parking');
 
-    const visitorRef = await database.ref('visitorParking').push({
+    const societyId = window.__SMS_SOCID__ || 'default_society';
+    const visitorRef = await database.ref(`societies/${societyId}/visitorParking`).push({
       visitorName: entry.visitorName,
       vehicleNumber: entry.vehicleNumber,
       flat: entry.flat || '',
@@ -2280,7 +2314,7 @@ async function saveVisitorParkingEntry(entry) {
       const allocation = getVisitorParkingAllocation(entry);
       savedAllocation = await saveParkingAllocation(allocation);
 
-      await database.ref('visitorParking').child(visitorRef.key).update({
+      await database.ref(`societies/${societyId}/visitorParking`).child(visitorRef.key).update({
         slot: entry.slot,
         allocationId: savedAllocation?.key || null,
         parkingLocation: allocation.location || ''
@@ -2385,19 +2419,21 @@ window.deleteVisitorEntry = async function(id) {
     ensureDatabaseAvailable('delete visitor parking entry');
 
     // Best effort: if we stored slot but not allocation id, just free slot status.
+    const societyId = window.__SMS_SOCID__ || 'default_society';
+
     const updates = {};
-    updates[`visitorParking/${id}`] = null;
+    updates[`societies/${societyId}/visitorParking/${id}`] = null;
 
     if (entry?.slot) {
       const slotRecord = await findParkingSlotRecord(entry.slot);
       if (slotRecord?.key) {
-        updates[`parkingSlots/${slotRecord.key}/status`] = 'available';
-        updates[`parkingSlots/${slotRecord.key}/allocationId`] = null;
+        updates[`societies/${societyId}/parkingSlots/${slotRecord.key}/status`] = 'available';
+        updates[`societies/${societyId}/parkingSlots/${slotRecord.key}/allocationId`] = null;
       }
     }
 
     if (entry?.allocationId) {
-      updates[`parkingAllocations/${entry.allocationId}`] = null;
+      updates[`societies/${societyId}/parkingAllocations/${entry.allocationId}`] = null;
     }
 
     await database.ref().update(updates);

@@ -18,6 +18,27 @@
       "residents": {
         ".read": "request.auth != null && (resource.id == request.auth.uid || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')",
         ".write": "request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'"
+      },
+
+      "towers": {
+        "$towerId": {
+          ".read": "request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'",
+          ".write": "request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'",
+
+          "wings": {
+            "$wingId": {
+              ".read": "request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'",
+              ".write": "request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'",
+
+              "flats": {
+                "$flatId": {
+                  ".read": "request.auth != null && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || resource.data.residentId == request.auth.uid)",
+                  ".write": "request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'"
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
