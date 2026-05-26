@@ -878,7 +878,6 @@
     if (status === 'Pending') return 'Accepted';
     if (status === 'Accepted') return 'In Progress';
     if (status === 'In Progress') return 'Completed';
-    if (status === 'Completed') return 'Rated';
     return null;
   }
 

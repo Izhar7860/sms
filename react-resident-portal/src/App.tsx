@@ -2,6 +2,7 @@ import React from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { AppLayout } from './components/layout/AppLayout'
+import { LoginPage } from './pages/LoginPage'
 import { ResidentDashboardPage } from './pages/resident/ResidentDashboardPage'
 import { ResidentProfilePage } from './pages/resident/ResidentProfilePage'
 import { ResidentVisitorsPage } from './pages/resident/ResidentVisitorsPage'
@@ -18,6 +19,8 @@ export default function App() {
         path="/"
         element={<Navigate to="/resident" replace />}
       />
+
+      <Route path="/login" element={<LoginPage />} />
 
       <Route
         path="/resident"

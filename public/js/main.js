@@ -1693,7 +1693,7 @@ function initAuthForm(user) {
       : isPasswordUpdate
         ? 'Enter a new password after opening the reset link from your email.'
         : isSignup
-          ? 'New users will be created in Firebase Auth with the selected role.'
+          ? 'New resident users will be created in Firebase Auth.'
           : 'Use an existing Firebase Auth email and password to sign in.';
     clearAuthStatus(authStatus);
   };
@@ -1712,6 +1712,7 @@ function initAuthForm(user) {
     const email = emailInput.value.trim();
     const password = passwordInput.value;
     const selectedRole = document.querySelector('input[name="role"]:checked')?.value || 'resident';
+    const allowAdminSignup = new URLSearchParams(window.location.search).get('allowAdminSignup') === '1';
 
     setAuthStatus(authStatus, 'info', 'Please wait...');
     submitButton.disabled = true;
@@ -1726,6 +1727,9 @@ function initAuthForm(user) {
       }
 
       if (mode === 'signup') {
+        if (selectedRole === 'admin' && !allowAdminSignup) {
+          throw new Error('Admin accounts cannot be created from this screen.');
+        }
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         await userCredential.user.updateProfile({ displayName: selectedRole });
         try {

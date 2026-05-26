@@ -675,6 +675,33 @@ p { margin-bottom: 0; }
   box-shadow: 0 0 0 4px var(--focus-ring) !important;
 }
 
+/* ===== MODALS (professional override) =====
+   Keep neumorphism for app cards, but make admin/resident forms inside selected modals look crisp. */
+.modal-professional .modal-content {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.16);
+}
+
+.modal-professional .modal-header,
+.modal-professional .modal-footer {
+  background: transparent;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+.modal-professional .form-control,
+.modal-professional .form-select {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  box-shadow: none;
+  transform: none;
+}
+
+.modal-professional .form-control:hover,
+.modal-professional .form-select:hover {
+  transform: none;
+}
+
 /* ===== PARKING ===== */
 
 .parking-grid {

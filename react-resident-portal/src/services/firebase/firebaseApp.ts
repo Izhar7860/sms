@@ -1,14 +1,19 @@
 import { FirebaseApp, getApps, initializeApp } from 'firebase/app'
 
 let app: FirebaseApp | null = null
+let initError: string | null = null
 
-// NOTE: This React module must preserve the existing Firebase setup.
-// We rely on env vars so it can be used without altering existing pages.
-// Add `react-resident-portal/.env.example` with VITE_* keys.
-export function firebaseAppInit() {
-  if (app) return app
+type FirebaseCfg = {
+  apiKey?: string
+  authDomain?: string
+  projectId?: string
+  storageBucket?: string
+  messagingSenderId?: string
+  appId?: string
+}
 
-  const cfg = {
+function loadConfig(): FirebaseCfg {
+  return {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
     projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
@@ -16,11 +21,32 @@ export function firebaseAppInit() {
     messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
     appId: import.meta.env.VITE_FIREBASE_APP_ID,
   }
+}
 
-  const hasAny = Object.values(cfg).some(Boolean)
-  if (!hasAny) {
-    // Still allow module to load; hooks will show error if Firebase init fails.
-    throw new Error('Firebase env vars are missing for react-resident-portal. Check .env.')
+export function getFirebaseInitError() {
+  return initError
+}
+
+// NOTE: This React module must preserve the existing Firebase setup.
+// Prefer env vars so it can be used without altering existing pages.
+// Add `react-resident-portal/.env.example` with VITE_* keys.
+export function firebaseAppInit(): FirebaseApp | null {
+  if (app) return app
+  if (initError) return null
+
+  const cfg = loadConfig()
+  const missing = Object.entries(cfg)
+    .filter(([, v]) => !v)
+    .map(([k]) => k)
+
+  if (missing.length === Object.keys(cfg).length) {
+    initError = 'Firebase is not configured for react-resident-portal. Copy `.env.example` to `.env` and fill `VITE_FIREBASE_*` values.'
+    return null
+  }
+
+  if (missing.length) {
+    initError = `Firebase config is incomplete for react-resident-portal. Missing: ${missing.join(', ')}.`
+    return null
   }
 
   if (!getApps().length) {

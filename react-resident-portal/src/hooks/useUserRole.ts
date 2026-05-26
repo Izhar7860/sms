@@ -20,10 +20,19 @@ export function useUserRole() {
         return
       }
 
+      // First preference: match the existing non-React portal behavior where role is stored in `displayName`.
+      // This enables admin accounts created via the HTML login page to work immediately in React.
+      if (user.displayName === 'admin') {
+        setRole('admin')
+        setLoading(false)
+        return
+      }
 
       try {
         // Role is expected in Firestore at: users/{uid}.role
-        const db = getFirestore()
+        const app = firebaseAppInit()
+        if (!app) throw new Error('Firebase is not configured')
+        const db = getFirestore(app)
         const snap = await getDoc(doc(db, 'users', user.uid))
         const r = snap.exists() ? (snap.data()?.role as Role | undefined) : undefined
         setRole(r === 'admin' ? 'admin' : 'resident')
